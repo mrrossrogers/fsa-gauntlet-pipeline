@@ -121,6 +121,10 @@
   }
   .actions button.publish{ background:var(--ready); color:#fff; border-color:var(--ready); }
   .actions button.kill{ background:var(--stuck); color:#fff; border-color:var(--stuck); }
+  .card .reason{
+    font-size:0.8rem; line-height:1.45; color:var(--stuck); margin-top:0.5rem;
+    padding-top:0.45rem; border-top:1px dashed var(--rule);
+  }
 
   /* --- Content funnel --- */
   #add-candidate{ border:1px solid var(--rule); padding:1.25rem; background:#fff; margin-bottom:1.75rem; }
@@ -170,6 +174,11 @@
   #detail h3{ font-family:'Fraunces', serif; margin:0 0 0.3rem; }
   #detail .meta{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; color:var(--ink-soft); margin-bottom:1rem; }
   #detail .draft{ white-space:pre-wrap; line-height:1.6; font-size:0.95rem; margin-bottom:1.25rem; }
+  #detail .stuck-callout{
+    background:#FBEDEA; border:1px solid var(--stuck); color:var(--stuck);
+    padding:0.75rem 0.9rem; margin-bottom:1.25rem; font-size:0.88rem; line-height:1.55;
+  }
+  #detail .stuck-callout strong{ display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
   #detail .critique{ border-top:1px solid var(--rule); padding-top:0.9rem; }
   #detail .critique h4{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; text-transform:uppercase; margin:0 0 0.6rem; }
   #detail .note{ font-size:0.85rem; margin-bottom:0.6rem; padding-left:0.7rem; border-left:2px solid var(--rule); }
@@ -317,30 +326,36 @@ function statusBadge(a){
 function card(a){
   const div = document.createElement('div');
   div.className = 'card';
+  const reasonHtml = (a.status === 'needs_human' && a.final_notes)
+    ? `<div class="reason">${a.final_notes}</div>`
+    : '';
   div.innerHTML = `
     <div class="title">${a.title}</div>
     <div class="meta"><span>${statusBadge(a)}</span><span>${new Date(a.updated_at).toLocaleString()}</span></div>
+    ${reasonHtml}
   `;
   div.addEventListener('click', (e) => { if (!e.target.closest('.actions')) openDetail(a.id); });
 
-  if (a.status === 'ready_for_review'){
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    actions.innerHTML = `
-      <button class="publish" data-decision="publish">Publish</button>
-      <button data-decision="hold">Hold</button>
-      <button class="kill" data-decision="kill">Kill</button>
-    `;
-    actions.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await fetch('/api/update-article', {
-        method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({ id: a.id, decision: btn.dataset.decision })
-      });
-      loadArticles();
-    }));
-    div.appendChild(actions);
-  }
+  // Publish/Hold only make sense once a piece is actually ready for a final call.
+  // Kill is available at every non-terminal stage -- there was previously no way
+  // to dismiss a stuck or unwanted article before it reached ready_for_review.
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML = a.status === 'ready_for_review'
+    ? `<button class="publish" data-decision="publish">Publish</button>
+       <button data-decision="hold">Hold</button>
+       <button class="kill" data-decision="kill">Kill</button>`
+    : `<button class="kill" data-decision="kill">Kill</button>`;
+  actions.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (btn.dataset.decision === 'kill' && !confirm('Kill this article? This removes it from the active queue.')) return;
+    await fetch('/api/update-article', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ id: a.id, decision: btn.dataset.decision })
+    });
+    loadArticles();
+  }));
+  div.appendChild(actions);
   return div;
 }
 
@@ -379,10 +394,12 @@ async function openDetail(id){
     </div>
   `).join('') || '<div class="empty">No critique yet.</div>';
 
+  const reasonLabel = a.status === 'needs_human' ? 'Why this needs you' : 'Notes';
   document.getElementById('detail').innerHTML = `
     <span class="close" onclick="document.getElementById('overlay').classList.remove('open')">close ✕</span>
     <h3>${title}</h3>
-    <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}${a.final_notes ? ' · ' + a.final_notes : ''}</div>
+    <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}</div>
+    ${a.final_notes ? `<div class="stuck-callout"><strong>${reasonLabel}</strong>${a.final_notes}</div>` : ''}
     <div class="draft">${a.draft ? a.draft.replace(/\n/g,'<br>') : '<span class="empty">No draft yet.</span>'}</div>
     <div class="critique"><h4>Critique trail</h4>${notes}</div>
   `;
