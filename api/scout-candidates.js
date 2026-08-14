@@ -20,7 +20,10 @@ export default async function handler(req, res) {
     const { issue } = req.body || {};
     const targetIssue = issue || 'current';
 
-    const result = await callClaude(SCOUT, JSON.stringify({ issue: targetIssue }));
+    // 9 candidates with a real seed + angle each run well past the 4096-token
+    // default used elsewhere in the pipeline (which is sized for single-item
+    // responses like a draft or one critique) -- give this call real headroom.
+    const result = await callClaude(SCOUT, JSON.stringify({ issue: targetIssue }), { maxTokens: 8192 });
     const candidates = Array.isArray(result.candidates) ? result.candidates : [];
 
     const rows = candidates
