@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FSA — Editorial Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAFAF6;
+    --ink:#211E1B;
+    --ink-soft:#5B564F;
+    --rule:#DEDACF;
+    --food:#8A6D2F;
+    --sex:#6B3F52;
+    --alcohol:#7A4A28;
+    --ready:#2F5D42;
+    --stuck:#A23E2E;
+    --archive:#8C877D;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Source Serif 4', Georgia, serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    padding:2.5rem 1.5rem 1.5rem; border-bottom:1px solid var(--rule);
+  }
+  header h1{
+    font-family:'Fraunces', serif; font-weight:600; font-size:1.9rem;
+    letter-spacing:-0.01em; margin:0;
+  }
+  header p{
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem;
+    text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-soft);
+    margin:0.4rem 0 0;
+  }
+  .tabs{ display:flex; gap:0; margin-top:1.25rem; }
+  .tab-btn{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; text-transform:uppercase;
+    letter-spacing:0.06em; padding:0.55rem 1.1rem; border:1px solid var(--rule); border-bottom:none;
+    background:var(--paper); color:var(--ink-soft); cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+  main{ max-width:1180px; margin:0 auto; padding:0 1.5rem 4rem; }
+  section{ margin-top:2.75rem; }
+  h2{
+    font-family:'Fraunces', serif; font-weight:600; font-size:1.15rem;
+    margin:0 0 1rem; padding-bottom:0.5rem; border-bottom:1px solid var(--rule);
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  /* --- Submission slip --- */
+  #submit-panel{
+    border:1px solid var(--rule); padding:1.25rem; background:#fff;
+  }
+  #submit-panel h2{ border:none; margin-bottom:0.9rem; }
+  .cat-tabs{ display:flex; gap:0.5rem; margin-bottom:0.9rem; }
+  .cat-tab{
+    flex:1; text-align:center; padding:0.55rem 0.4rem; border:1px solid var(--rule);
+    cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size:0.75rem;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft);
+    background:var(--paper); user-select:none;
+  }
+  .cat-tab.active[data-cat="food"]{ background:var(--food); color:#fff; border-color:var(--food); }
+  .cat-tab.active[data-cat="sex"]{ background:var(--sex); color:#fff; border-color:var(--sex); }
+  .cat-tab.active[data-cat="alcohol"]{ background:var(--alcohol); color:#fff; border-color:var(--alcohol); }
+  #submit-panel textarea, #submit-panel input{
+    width:100%; font-family:'Source Serif 4', serif; font-size:0.95rem;
+    border:1px solid var(--rule); background:var(--paper); color:var(--ink);
+    padding:0.6rem; margin-bottom:0.7rem; resize:vertical;
+  }
+  #submit-panel label{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-bottom:0.3rem;
+  }
+  #submit-panel button{
+    font-family:'IBM Plex Mono', monospace; font-size:0.78rem; text-transform:uppercase;
+    letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
+    padding:0.65rem 1.3rem; cursor:pointer;
+  }
+  #submit-panel button:hover{ opacity:0.85; }
+  #submit-status{ font-family:'IBM Plex Mono', monospace; font-size:0.75rem; margin-top:0.6rem; }
+
+  /* --- Category queues --- */
+  .queues{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; }
+  @media (max-width:820px){ .queues{ grid-template-columns:1fr; } }
+  .queue h3{
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; text-transform:uppercase;
+    letter-spacing:0.08em; padding:0.4rem 0.6rem; color:#fff; margin:0 0 0.75rem;
+  }
+  .queue[data-cat="food"] h3{ background:var(--food); }
+  .queue[data-cat="sex"] h3{ background:var(--sex); }
+  .queue[data-cat="alcohol"] h3{ background:var(--alcohol); }
+  .card{
+    border:1px solid var(--rule); background:#fff; padding:0.75rem 0.85rem; margin-bottom:0.7rem;
+    cursor:pointer;
+  }
+  .card:hover{ border-color:var(--ink-soft); }
+  .card .title{ font-size:0.95rem; line-height:1.3; margin-bottom:0.35rem; }
+  .card .meta{
+    font-family:'IBM Plex Mono', monospace; font-size:0.65rem; color:var(--ink-soft);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .badge{
+    display:inline-block; padding:0.1rem 0.4rem; font-size:0.62rem;
+    text-transform:uppercase; letter-spacing:0.05em; border:1px solid currentColor;
+  }
+  .badge.ready{ color:var(--ready); }
+  .badge.stuck{ color:var(--stuck); }
+  .badge.progress{ color:var(--ink-soft); }
+  .empty{ font-family:'IBM Plex Mono', monospace; font-size:0.72rem; color:var(--ink-soft); padding:0.5rem 0; }
+  .actions{ margin-top:0.5rem; display:flex; gap:0.4rem; }
+  .actions button{
+    font-family:'IBM Plex Mono', monospace; font-size:0.65rem; text-transform:uppercase;
+    padding:0.3rem 0.55rem; border:1px solid var(--ink); background:#fff; cursor:pointer;
+  }
+  .actions button.publish{ background:var(--ready); color:#fff; border-color:var(--ready); }
+  .actions button.kill{ background:var(--stuck); color:#fff; border-color:var(--stuck); }
+
+  /* --- Content funnel --- */
+  #add-candidate{ border:1px solid var(--rule); padding:1.25rem; background:#fff; margin-bottom:1.75rem; }
+  #add-candidate h2{ border:none; margin-bottom:0.9rem; }
+  .candidate-list{ display:grid; gap:0.7rem; }
+  .candidate-card{
+    border:1px solid var(--rule); background:#fff; padding:0.8rem 0.9rem;
+    display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;
+  }
+  .candidate-card .info .title{ font-size:0.95rem; margin-bottom:0.3rem; }
+  .candidate-card .info .meta{
+    font-family:'IBM Plex Mono', monospace; font-size:0.65rem; color:var(--ink-soft);
+    display:flex; gap:0.6rem; align-items:center;
+  }
+  .candidate-card .cat-mark{
+    display:inline-block; width:1.1rem; height:1.1rem; text-align:center; line-height:1.1rem;
+    color:#fff; font-size:0.6rem; font-family:'IBM Plex Mono', monospace;
+  }
+  .candidate-card .cat-mark.food{ background:var(--food); }
+  .candidate-card .cat-mark.sex{ background:var(--sex); }
+  .candidate-card .cat-mark.alcohol{ background:var(--alcohol); }
+  .candidate-card .actions{ margin:0; flex-shrink:0; }
+
+  /* --- Archive --- */
+  table{ width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th{
+    text-align:left; font-family:'IBM Plex Mono', monospace; font-size:0.65rem;
+    text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft);
+    border-bottom:1px solid var(--rule); padding:0.4rem 0.5rem;
+  }
+  td{ padding:0.5rem; border-bottom:1px solid var(--rule); }
+  tr:hover td{ background:#F2F0E8; cursor:pointer; }
+
+  /* --- Detail overlay --- */
+  #overlay{
+    display:none; position:fixed; inset:0; background:rgba(33,30,27,0.6); z-index:10;
+    padding:2rem 1rem; overflow-y:auto;
+  }
+  #overlay.open{ display:block; }
+  #detail{
+    max-width:720px; margin:0 auto; background:var(--paper); border:1px solid var(--rule); padding:1.75rem;
+  }
+  #detail .close{
+    float:right; font-family:'IBM Plex Mono', monospace; cursor:pointer; font-size:0.8rem;
+    color:var(--ink-soft); border:1px solid var(--rule); padding:0.2rem 0.5rem;
+  }
+  #detail h3{ font-family:'Fraunces', serif; margin:0 0 0.3rem; }
+  #detail .meta{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; color:var(--ink-soft); margin-bottom:1rem; }
+  #detail .draft{ white-space:pre-wrap; line-height:1.6; font-size:0.95rem; margin-bottom:1.25rem; }
+  #detail .critique{ border-top:1px solid var(--rule); padding-top:0.9rem; }
+  #detail .critique h4{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; text-transform:uppercase; margin:0 0 0.6rem; }
+  #detail .note{ font-size:0.85rem; margin-bottom:0.6rem; padding-left:0.7rem; border-left:2px solid var(--rule); }
+  #detail .note .agent{ font-family:'IBM Plex Mono', monospace; font-size:0.65rem; color:var(--ink-soft); text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FSA — Editorial Desk</h1>
+  <p>gauntlet pipeline · control room</p>
+  <div class="tabs">
+    <div class="tab-btn active" data-tab="gauntlet">Gauntlet</div>
+    <div class="tab-btn" data-tab="funnel">Content Funnel</div>
+  </div>
+</header>
+
+<main>
+<div class="tab-panel active" id="panel-gauntlet">
+
+  <section id="submit-panel">
+    <h2>Send an idea to the desk</h2>
+    <div class="cat-tabs">
+      <div class="cat-tab active" data-cat="food">Food</div>
+      <div class="cat-tab" data-cat="sex">Sex</div>
+      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
+    </div>
+    <label>Seed — the place / bottle / scenario</label>
+    <textarea id="f-seed" rows="2" placeholder="the new omakase counter that opened on 3rd"></textarea>
+    <label>Angle (optional — a take you already have)</label>
+    <textarea id="f-angle" rows="2"></textarea>
+    <label>Issue (optional — defaults to "current")</label>
+    <input id="f-issue" placeholder="current">
+    <button id="submit-btn">Send to desk</button>
+    <div id="submit-status"></div>
+  </section>
+
+  <section>
+    <h2>In the gauntlet</h2>
+    <div class="queues">
+      <div class="queue" data-cat="food"><h3>Food</h3><div class="list" id="list-food"></div></div>
+      <div class="queue" data-cat="sex"><h3>Sex</h3><div class="list" id="list-sex"></div></div>
+      <div class="queue" data-cat="alcohol"><h3>Alcohol</h3><div class="list" id="list-alcohol"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Archive — published &amp; decided</h2>
+    <table>
+      <thead><tr><th>Title</th><th>Category</th><th>Decision</th><th>Updated</th></tr></thead>
+      <tbody id="archive-body"></tbody>
+    </table>
+    <div class="empty" id="archive-empty" style="display:none;">Nothing archived yet.</div>
+  </section>
+</div>
+
+<div class="tab-panel" id="panel-funnel">
+
+  <section id="add-candidate">
+    <h2>Drop a candidate into the funnel</h2>
+    <div class="cat-tabs">
+      <div class="cat-tab active" data-cat="food">Food</div>
+      <div class="cat-tab" data-cat="sex">Sex</div>
+      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
+    </div>
+    <label>Seed</label>
+    <textarea id="c-seed" rows="2" placeholder="a candidate subject worth considering"></textarea>
+    <label>Angle (optional)</label>
+    <textarea id="c-angle" rows="2"></textarea>
+    <label>Issue (optional — defaults to "current")</label>
+    <input id="c-issue" placeholder="current">
+    <button id="candidate-btn">Add to funnel</button>
+    <div id="candidate-status"></div>
+  </section>
+
+  <section>
+    <h2>Pending candidates</h2>
+    <div class="candidate-list" id="candidate-list"></div>
+    <div class="empty" id="candidate-empty" style="display:none;">Nothing waiting for review. Scout-sourced candidates will land here too, once that's built.</div>
+  </section>
+
+</div>
+
+</main>
+
+<div id="overlay"><div id="detail"></div></div>
+
+<script>
+const ACTIVE_TERMINAL = ['published','held','killed'];
+let selectedCat = 'food';
+let selectedCandidateCat = 'food';
+
+// top-level tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'funnel') loadCandidates();
+}));
+
+// the submit-panel's own category tabs (#submit-panel .cat-tab)
+document.querySelectorAll('#submit-panel .cat-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#submit-panel .cat-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  selectedCat = t.dataset.cat;
+}));
+
+// the add-candidate panel's own category tabs (#add-candidate .cat-tab)
+document.querySelectorAll('#add-candidate .cat-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#add-candidate .cat-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  selectedCandidateCat = t.dataset.cat;
+}));
+
+document.getElementById('submit-btn').addEventListener('click', async () => {
+  const seed = document.getElementById('f-seed').value.trim();
+  const angle = document.getElementById('f-angle').value.trim();
+  const issue = document.getElementById('f-issue').value.trim();
+  const statusEl = document.getElementById('submit-status');
+  if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
+  statusEl.textContent = 'Sending…';
+  try{
+    const res = await fetch('/api/submit-idea', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ category: selectedCat, seed, angle: angle || undefined, issue: issue || undefined })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed');
+    statusEl.textContent = 'On the desk — ' + data.id;
+    document.getElementById('f-seed').value = '';
+    document.getElementById('f-angle').value = '';
+    loadArticles();
+  }catch(e){
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+});
+
+function statusBadge(a){
+  if (a.status === 'needs_human') return '<span class="badge stuck">needs you</span>';
+  if (a.status === 'ready_for_review') return '<span class="badge ready">ready for review</span>';
+  return '<span class="badge progress">' + a.status.replace(/_/g,' ') + '</span>';
+}
+
+function card(a){
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.innerHTML = `
+    <div class="title">${a.title}</div>
+    <div class="meta"><span>${statusBadge(a)}</span><span>${new Date(a.updated_at).toLocaleString()}</span></div>
+  `;
+  div.addEventListener('click', (e) => { if (!e.target.closest('.actions')) openDetail(a.id); });
+
+  if (a.status === 'ready_for_review'){
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.innerHTML = `
+      <button class="publish" data-decision="publish">Publish</button>
+      <button data-decision="hold">Hold</button>
+      <button class="kill" data-decision="kill">Kill</button>
+    `;
+    actions.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await fetch('/api/update-article', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ id: a.id, decision: btn.dataset.decision })
+      });
+      loadArticles();
+    }));
+    div.appendChild(actions);
+  }
+  return div;
+}
+
+async function loadArticles(){
+  const res = await fetch('/api/list-articles');
+  const { articles } = await res.json();
+
+  ['food','sex','alcohol'].forEach(cat => {
+    const el = document.getElementById('list-' + cat);
+    el.innerHTML = '';
+    const active = articles.filter(a => a.category === cat && !ACTIVE_TERMINAL.includes(a.status));
+    if (!active.length){ el.innerHTML = '<div class="empty">Nothing in the queue.</div>'; return; }
+    active.forEach(a => el.appendChild(card(a)));
+  });
+
+  const archiveBody = document.getElementById('archive-body');
+  archiveBody.innerHTML = '';
+  const archived = articles.filter(a => ACTIVE_TERMINAL.includes(a.status));
+  document.getElementById('archive-empty').style.display = archived.length ? 'none' : 'block';
+  archived.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.title}</td><td class="mono">${a.category}</td><td class="mono">${a.final_decision || a.status}</td><td class="mono">${new Date(a.updated_at).toLocaleDateString()}</td>`;
+    tr.addEventListener('click', () => openDetail(a.id));
+    archiveBody.appendChild(tr);
+  });
+}
+
+async function openDetail(id){
+  const res = await fetch('/api/get-article?id=' + id);
+  const { article: a } = await res.json();
+  const title = a.brief?.title_working || a.brief?.subject || '(untitled)';
+  const notes = (a.critique_log || []).map(c => `
+    <div class="note">
+      <div class="agent">${c.agent} — ${c.verdict} — round ${c.round}</div>
+      ${(c.notes || []).map(n => `<div>${n.problem || n.item || ''} ${n.fix ? '→ ' + n.fix : ''}</div>`).join('')}
+    </div>
+  `).join('') || '<div class="empty">No critique yet.</div>';
+
+  document.getElementById('detail').innerHTML = `
+    <span class="close" onclick="document.getElementById('overlay').classList.remove('open')">close ✕</span>
+    <h3>${title}</h3>
+    <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}${a.final_notes ? ' · ' + a.final_notes : ''}</div>
+    <div class="draft">${a.draft ? a.draft.replace(/\n/g,'<br>') : '<span class="empty">No draft yet.</span>'}</div>
+    <div class="critique"><h4>Critique trail</h4>${notes}</div>
+  `;
+  document.getElementById('overlay').classList.add('open');
+}
+document.getElementById('overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'overlay') e.currentTarget.classList.remove('open');
+});
+
+loadArticles();
+setInterval(loadArticles, 30000);
+
+document.getElementById('candidate-btn').addEventListener('click', async () => {
+  const seed = document.getElementById('c-seed').value.trim();
+  const angle = document.getElementById('c-angle').value.trim();
+  const issue = document.getElementById('c-issue').value.trim();
+  const statusEl = document.getElementById('candidate-status');
+  if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
+  statusEl.textContent = 'Adding…';
+  try{
+    const res = await fetch('/api/add-candidate', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ category: selectedCandidateCat, seed, angle: angle || undefined, issue: issue || undefined })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed');
+    statusEl.textContent = 'Added to funnel.';
+    document.getElementById('c-seed').value = '';
+    document.getElementById('c-angle').value = '';
+    loadCandidates();
+  }catch(e){
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+});
+
+function candidateCard(c){
+  const div = document.createElement('div');
+  div.className = 'candidate-card';
+  div.innerHTML = `
+    <div class="info">
+      <div class="title">${c.seed}</div>
+      <div class="meta">
+        <span class="cat-mark ${c.category}">${c.category[0].toUpperCase()}</span>
+        <span>${c.source}</span><span>${c.issue}</span>
+        <span>${new Date(c.created_at).toLocaleDateString()}</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="publish" data-action="approve">Approve → Gauntlet</button>
+      <button class="kill" data-action="reject">Reject</button>
+    </div>
+  `;
+  div.querySelector('[data-action="approve"]').addEventListener('click', async () => {
+    await fetch('/api/approve-candidate', {
+      method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id: c.id })
+    });
+    loadCandidates(); loadArticles();
+  });
+  div.querySelector('[data-action="reject"]').addEventListener('click', async () => {
+    await fetch('/api/reject-candidate', {
+      method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id: c.id })
+    });
+    loadCandidates();
+  });
+  return div;
+}
+
+async function loadCandidates(){
+  const res = await fetch('/api/list-candidates');
+  const { candidates } = await res.json();
+  const list = document.getElementById('candidate-list');
+  list.innerHTML = '';
+  document.getElementById('candidate-empty').style.display = candidates.length ? 'none' : 'block';
+  candidates.forEach(c => list.appendChild(candidateCard(c)));
+}
+</script>
+
+</body>
+</html>
