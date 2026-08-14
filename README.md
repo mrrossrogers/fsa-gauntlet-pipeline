@@ -12,7 +12,13 @@ the full status flow (`submitted` → `briefed` → `drafted` → `text_approved
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=       # service role key, not anon — this runs server-side only
 ANTHROPIC_API_KEY=
+OPENAI_API_KEY=             # image generation (gpt-image-1) for the image_drafted stage
 ```
+
+Images are generated via OpenAI's `gpt-image-1` and stored in the Supabase Storage
+bucket `fsa-images` (public, created via `supabase-schema.sql`'s storage section —
+or manually: `insert into storage.buckets (id, name, public) values ('fsa-images', 'fsa-images', true)`)
+rather than relying on OpenAI's own hosted URL, which isn't guaranteed to stay valid long-term.
 
 ## 3. Deploy
 Drop `api/submit-idea.js` and `api/process-article.js` into your existing Vercel

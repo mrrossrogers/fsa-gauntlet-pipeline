@@ -63,6 +63,16 @@ create trigger fsa_candidates_touch
   before update on public.fsa_content_candidates
   for each row execute function public.fsa_touch_updated_at();
 
+-- ── Storage ──────────────────────────────────────────────────────────────
+-- Generated article images (via OpenAI gpt-image-1) are uploaded here by
+-- lib/image-gen.js rather than relying on the provider's own hosted URL.
+-- Public bucket: served without RLS/auth checks, so image_url works as a
+-- plain <img src>. Uploads happen server-side with the service-role key,
+-- which bypasses RLS regardless.
+insert into storage.buckets (id, name, public)
+values ('fsa-images', 'fsa-images', true)
+on conflict (id) do nothing;
+
 -- ── Row Level Security ───────────────────────────────────────────────────
 -- All access to these tables goes through the Vercel API using the
 -- service-role key (SUPABASE_SERVICE_KEY), which bypasses RLS entirely.
