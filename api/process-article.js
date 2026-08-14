@@ -7,6 +7,7 @@
 // If no id is given, picks the oldest non-terminal article and processes it.
 
 import { getSupabase } from '../lib/supabase.js';
+import { generateAndStoreImage } from '../lib/image-gen.js';
 import {
   ASSIGNMENT_EDITOR, CORRESPONDENT, FACT_SPECIFICITY_DESK,
   EDITORIAL_TEST_AUDITOR, CATEGORY_DESK, ART_DIRECTOR,
@@ -143,16 +144,18 @@ export default async function handler(req, res) {
 
       case 'text_approved': {
         const imgBrief = await callClaude(ART_DIRECTOR, JSON.stringify({ draft: article.draft, category: article.category }));
-        // NOTE: plug in your actual image generation call here (e.g. an image model API).
-        // This just stores the brief/prompt; wire image_url once generation is added.
+        const nextImageRound = article.image_round + 1;
+        const imageUrl = await generateAndStoreImage(supabase, imgBrief.prompt, id, nextImageRound);
         await supabase.from('fsa_articles').update({
-          image_brief: imgBrief, status: 'image_drafted', image_round: article.image_round + 1,
+          image_brief: imgBrief, image_url: imageUrl, status: 'image_drafted', image_round: nextImageRound,
         }).eq('id', id);
         break;
       }
 
       case 'image_drafted': {
-        // Requires article.image_url to be populated by your image generation step.
+        // image_url is set by generateAndStoreImage() in the text_approved case above,
+        // in the same invocation that sets this status. This guard is defensive only --
+        // it should never actually trigger in normal operation.
         if (!article.image_url) {
           return res.status(200).json({ message: 'waiting on image generation to populate image_url' });
         }
