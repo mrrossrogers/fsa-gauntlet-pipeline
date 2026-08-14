@@ -2,6 +2,9 @@
   "functions": {
     "api/process-article.js": {
       "maxDuration": 60
+    },
+    "api/scout-candidates.js": {
+      "maxDuration": 30
     }
   }
 }

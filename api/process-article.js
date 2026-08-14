@@ -7,6 +7,7 @@
 // If no id is given, picks the oldest non-terminal article and processes it.
 
 import { getSupabase } from '../lib/supabase.js';
+import { callClaude } from '../lib/claude.js';
 import { generateAndStoreImage } from '../lib/image-gen.js';
 import {
   ASSIGNMENT_EDITOR, CORRESPONDENT, FACT_SPECIFICITY_DESK,
@@ -16,53 +17,6 @@ import {
 
 const MAX_ROUNDS = 3;
 const TERMINAL = ['ready_for_review', 'needs_human', 'published', 'held', 'killed'];
-
-async function callClaude(system, userContent) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('Missing required env var: ANTHROPIC_API_KEY');
-  }
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: 4096,
-      // Sonnet 5 runs adaptive thinking by default when `thinking` is omitted
-      // (unlike Sonnet 4.6, which ran no thinking by default), and max_tokens
-      // caps thinking + response text together. Every stage here wants a
-      // single structured JSON object back, not deliberation, so disable it
-      // explicitly -- otherwise thinking can silently eat the budget and
-      // truncate the draft mid-sentence before the closing JSON brace.
-      thinking: { type: 'disabled' },
-      system,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  });
-  const data = await res.json();
-
-  // Surface the real Anthropic error instead of falling through to an empty
-  // string and a cryptic "Unexpected end of JSON input" from JSON.parse('').
-  if (!res.ok) {
-    throw new Error(`Anthropic API error (${res.status}): ${data.error?.message || JSON.stringify(data)}`);
-  }
-
-  const text = data.content?.map(b => b.text || '').join('\n') ?? '';
-  const clean = text.replace(/```json|```/g, '').trim();
-  if (!clean) {
-    throw new Error(`Claude returned no parseable content. Raw response: ${JSON.stringify(data)}`);
-  }
-
-  try {
-    return JSON.parse(clean);
-  } catch {
-    throw new Error(`Claude response wasn't valid JSON: ${clean.slice(0, 500)}`);
-  }
-}
 
 async function logCritique(article, stage, agent, verdict, notes, round) {
   const entry = { stage, agent, verdict, notes, round, at: new Date().toISOString() };

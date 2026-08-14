@@ -78,12 +78,12 @@
     display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem;
     text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-bottom:0.3rem;
   }
-  #submit-panel button{
+  #submit-panel button, #add-candidate button{
     font-family:'IBM Plex Mono', monospace; font-size:0.78rem; text-transform:uppercase;
     letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
     padding:0.65rem 1.3rem; cursor:pointer;
   }
-  #submit-panel button:hover{ opacity:0.85; }
+  #submit-panel button:hover, #add-candidate button:hover{ opacity:0.85; }
   #submit-status{ font-family:'IBM Plex Mono', monospace; font-size:0.75rem; margin-top:0.6rem; }
 
   /* --- Category queues --- */
@@ -256,8 +256,12 @@
 
   <section>
     <h2>Pending candidates</h2>
+    <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
+      <button id="scout-btn">Scout for ideas</button>
+      <span id="scout-status" class="mono" style="font-size:0.75rem; color:var(--ink-soft);"></span>
+    </div>
     <div class="candidate-list" id="candidate-list"></div>
-    <div class="empty" id="candidate-empty" style="display:none;">Nothing waiting for review. Scout-sourced candidates will land here too, once that's built.</div>
+    <div class="empty" id="candidate-empty" style="display:none;">Nothing waiting for review. Click "Scout for ideas" above to generate a batch, or drop one in yourself.</div>
   </section>
 
 </div>
@@ -475,6 +479,24 @@ async function loadCandidates(){
   document.getElementById('candidate-empty').style.display = candidates.length ? 'none' : 'block';
   candidates.forEach(c => list.appendChild(candidateCard(c)));
 }
+
+document.getElementById('scout-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('scout-btn');
+  const statusEl = document.getElementById('scout-status');
+  btn.disabled = true;
+  statusEl.textContent = 'Scouting — 9 ideas across food/sex/alcohol, takes a moment…';
+  try{
+    const res = await fetch('/api/scout-candidates', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed');
+    statusEl.textContent = `Added ${data.added} candidates.`;
+    loadCandidates();
+  }catch(e){
+    statusEl.textContent = 'Error: ' + e.message;
+  }finally{
+    btn.disabled = false;
+  }
+});
 </script>
 
 </body>
