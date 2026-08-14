@@ -6,14 +6,13 @@
 // POST body: { "id": "<article uuid>" }
 // If no id is given, picks the oldest non-terminal article and processes it.
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../lib/supabase.js';
 import {
   ASSIGNMENT_EDITOR, CORRESPONDENT, FACT_SPECIFICITY_DESK,
   EDITORIAL_TEST_AUDITOR, CATEGORY_DESK, ART_DIRECTOR,
   PHOTO_CRITIC, EDITOR_IN_CHIEF,
 } from '../lib/prompts.js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const MAX_ROUNDS = 3;
 const TERMINAL = ['ready_for_review', 'needs_human', 'published', 'held', 'killed'];
 
@@ -48,20 +47,22 @@ export default async function handler(req, res) {
   // article" path. POST with a body {id} is for manual/self-chained triggers.
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
-  let id = req.method === 'POST' ? (req.body || {}).id : undefined;
-  if (!id) {
-    const { data } = await supabase
-      .from('fsa_articles').select('id')
-      .not('status', 'in', `(${TERMINAL.join(',')})`)
-      .order('created_at', { ascending: true }).limit(1).maybeSingle();
-    if (!data) return res.status(200).json({ message: 'nothing to process' });
-    id = data.id;
-  }
-
-  const { data: article, error } = await supabase.from('fsa_articles').select('*').eq('id', id).single();
-  if (error || !article) return res.status(404).json({ error: 'article not found' });
-
   try {
+    const supabase = getSupabase();
+
+    let id = req.method === 'POST' ? (req.body || {}).id : undefined;
+    if (!id) {
+      const { data } = await supabase
+        .from('fsa_articles').select('id')
+        .not('status', 'in', `(${TERMINAL.join(',')})`)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle();
+      if (!data) return res.status(200).json({ message: 'nothing to process' });
+      id = data.id;
+    }
+
+    const { data: article, error } = await supabase.from('fsa_articles').select('*').eq('id', id).single();
+    if (error || !article) return res.status(404).json({ error: 'article not found' });
+
     switch (article.status) {
 
       case 'submitted': {
