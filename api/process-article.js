@@ -30,7 +30,14 @@ async function callClaude(system, userContent) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 2000,
+      max_tokens: 4096,
+      // Sonnet 5 runs adaptive thinking by default when `thinking` is omitted
+      // (unlike Sonnet 4.6, which ran no thinking by default), and max_tokens
+      // caps thinking + response text together. Every stage here wants a
+      // single structured JSON object back, not deliberation, so disable it
+      // explicitly -- otherwise thinking can silently eat the budget and
+      // truncate the draft mid-sentence before the closing JSON brace.
+      thinking: { type: 'disabled' },
       system,
       messages: [{ role: 'user', content: userContent }],
     }),
