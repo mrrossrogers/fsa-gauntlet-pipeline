@@ -59,16 +59,6 @@
     border:1px solid var(--rule); padding:1.25rem; background:#fff;
   }
   #submit-panel h2{ border:none; margin-bottom:0.9rem; }
-  .cat-tabs{ display:flex; gap:0.5rem; margin-bottom:0.9rem; }
-  .cat-tab{
-    flex:1; text-align:center; padding:0.55rem 0.4rem; border:1px solid var(--rule);
-    cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size:0.75rem;
-    text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft);
-    background:var(--paper); user-select:none;
-  }
-  .cat-tab.active[data-cat="food"]{ background:var(--food); color:#fff; border-color:var(--food); }
-  .cat-tab.active[data-cat="sex"]{ background:var(--sex); color:#fff; border-color:var(--sex); }
-  .cat-tab.active[data-cat="alcohol"]{ background:var(--alcohol); color:#fff; border-color:var(--alcohol); }
   #submit-panel textarea, #submit-panel input{
     width:100%; font-family:'Source Serif 4', serif; font-size:0.95rem;
     border:1px solid var(--rule); background:var(--paper); color:var(--ink);
@@ -217,11 +207,6 @@
 
   <section id="submit-panel">
     <h2>Send an idea to the desk</h2>
-    <div class="cat-tabs">
-      <div class="cat-tab active" data-cat="food">Food</div>
-      <div class="cat-tab" data-cat="sex">Sex</div>
-      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
-    </div>
     <label>Seed — the place / bottle / scenario</label>
     <textarea id="f-seed" rows="2" placeholder="the new omakase counter that opened on 3rd"></textarea>
     <label>Angle (optional — a take you already have)</label>
@@ -255,11 +240,6 @@
 
   <section id="add-candidate">
     <h2>Drop a candidate into the funnel</h2>
-    <div class="cat-tabs">
-      <div class="cat-tab active" data-cat="food">Food</div>
-      <div class="cat-tab" data-cat="sex">Sex</div>
-      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
-    </div>
     <label>Seed</label>
     <textarea id="c-seed" rows="2" placeholder="a candidate subject worth considering"></textarea>
     <label>Angle (optional)</label>
@@ -288,8 +268,6 @@
 
 <script>
 const ACTIVE_TERMINAL = ['published','held','killed'];
-let selectedCat = 'food';
-let selectedCandidateCat = 'food';
 
 // top-level tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -300,35 +278,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
   if (btn.dataset.tab === 'funnel') loadCandidates();
 }));
 
-// the submit-panel's own category tabs (#submit-panel .cat-tab)
-document.querySelectorAll('#submit-panel .cat-tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('#submit-panel .cat-tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  selectedCat = t.dataset.cat;
-}));
-
-// the add-candidate panel's own category tabs (#add-candidate .cat-tab)
-document.querySelectorAll('#add-candidate .cat-tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('#add-candidate .cat-tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  selectedCandidateCat = t.dataset.cat;
-}));
-
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const seed = document.getElementById('f-seed').value.trim();
   const angle = document.getElementById('f-angle').value.trim();
   const issue = document.getElementById('f-issue').value.trim();
   const statusEl = document.getElementById('submit-status');
   if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
-  statusEl.textContent = 'Sending…';
+  statusEl.textContent = 'Sending — classifying category…';
   try{
     const res = await fetch('/api/submit-idea', {
       method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({ category: selectedCat, seed, angle: angle || undefined, issue: issue || undefined })
+      body: JSON.stringify({ seed, angle: angle || undefined, issue: issue || undefined })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'failed');
-    statusEl.textContent = 'On the desk — ' + data.id;
+    statusEl.textContent = 'On the desk (' + data.category + ') — ' + data.id;
     document.getElementById('f-seed').value = '';
     document.getElementById('f-angle').value = '';
     loadArticles();
@@ -480,15 +444,15 @@ document.getElementById('candidate-btn').addEventListener('click', async () => {
   const issue = document.getElementById('c-issue').value.trim();
   const statusEl = document.getElementById('candidate-status');
   if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
-  statusEl.textContent = 'Adding…';
+  statusEl.textContent = 'Adding — classifying category…';
   try{
     const res = await fetch('/api/add-candidate', {
       method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({ category: selectedCandidateCat, seed, angle: angle || undefined, issue: issue || undefined })
+      body: JSON.stringify({ seed, angle: angle || undefined, issue: issue || undefined })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'failed');
-    statusEl.textContent = 'Added to funnel.';
+    statusEl.textContent = 'Added to funnel (' + data.category + ').';
     document.getElementById('c-seed').value = '';
     document.getElementById('c-angle').value = '';
     loadCandidates();
