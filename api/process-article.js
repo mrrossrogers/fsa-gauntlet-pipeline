@@ -17,6 +17,10 @@ const MAX_ROUNDS = 3;
 const TERMINAL = ['ready_for_review', 'needs_human', 'published', 'held', 'killed'];
 
 async function callClaude(system, userContent) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Missing required env var: ANTHROPIC_API_KEY');
+  }
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -32,9 +36,24 @@ async function callClaude(system, userContent) {
     }),
   });
   const data = await res.json();
+
+  // Surface the real Anthropic error instead of falling through to an empty
+  // string and a cryptic "Unexpected end of JSON input" from JSON.parse('').
+  if (!res.ok) {
+    throw new Error(`Anthropic API error (${res.status}): ${data.error?.message || JSON.stringify(data)}`);
+  }
+
   const text = data.content?.map(b => b.text || '').join('\n') ?? '';
   const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  if (!clean) {
+    throw new Error(`Claude returned no parseable content. Raw response: ${JSON.stringify(data)}`);
+  }
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    throw new Error(`Claude response wasn't valid JSON: ${clean.slice(0, 500)}`);
+  }
 }
 
 async function logCritique(article, stage, agent, verdict, notes, round) {
