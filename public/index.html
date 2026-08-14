@@ -179,6 +179,22 @@
     padding:0.75rem 0.9rem; margin-bottom:1.25rem; font-size:0.88rem; line-height:1.55;
   }
   #detail .stuck-callout strong{ display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
+  #detail .revise-panel{ border:1px solid var(--rule); background:#fff; padding:1rem; margin-bottom:1.25rem; }
+  #detail .revise-panel label{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:0.65rem;
+    text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:0.3rem;
+  }
+  #detail .revise-panel textarea{
+    width:100%; font-family:'Source Serif 4', serif; font-size:0.9rem;
+    border:1px solid var(--rule); background:var(--paper); color:var(--ink);
+    padding:0.5rem; margin-bottom:0.6rem; resize:vertical; box-sizing:border-box;
+  }
+  #detail .revise-panel button{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; text-transform:uppercase;
+    letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
+    padding:0.55rem 1.1rem; cursor:pointer;
+  }
+  #detail .revise-panel #revise-status{ font-size:0.72rem; margin-top:0.5rem; color:var(--ink-soft); }
   #detail .critique{ border-top:1px solid var(--rule); padding-top:0.9rem; }
   #detail .critique h4{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; text-transform:uppercase; margin:0 0 0.6rem; }
   #detail .note{ font-size:0.85rem; margin-bottom:0.6rem; padding-left:0.7rem; border-left:2px solid var(--rule); }
@@ -387,6 +403,10 @@ async function loadArticles(){
   });
 }
 
+function escapeHtml(str){
+  return String(str || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 async function openDetail(id){
   const res = await fetch('/api/get-article?id=' + id);
   const { article: a } = await res.json();
@@ -399,15 +419,53 @@ async function openDetail(id){
   `).join('') || '<div class="empty">No critique yet.</div>';
 
   const reasonLabel = a.status === 'needs_human' ? 'Why this needs you' : 'Notes';
+  // needs_human is the one status where the article is stuck waiting on a
+  // human correction -- give a way to fix and resubmit right here instead
+  // of forcing a kill + manually re-typed fresh submission.
+  const reviseHtml = a.status === 'needs_human' ? `
+    <div class="revise-panel">
+      <label>Revise the seed</label>
+      <textarea id="revise-seed" rows="2">${escapeHtml(a.seed)}</textarea>
+      <label>Revise the angle (optional)</label>
+      <textarea id="revise-angle" rows="2">${escapeHtml(a.angle)}</textarea>
+      <button id="revise-btn">Resubmit to desk</button>
+      <div id="revise-status" class="mono"></div>
+    </div>
+  ` : '';
+
   document.getElementById('detail').innerHTML = `
     <span class="close" onclick="document.getElementById('overlay').classList.remove('open')">close ✕</span>
     <h3>${title}</h3>
     <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}</div>
     ${a.final_notes ? `<div class="stuck-callout"><strong>${reasonLabel}</strong>${a.final_notes}</div>` : ''}
+    ${reviseHtml}
     <div class="draft">${a.draft ? a.draft.replace(/\n/g,'<br>') : '<span class="empty">No draft yet.</span>'}</div>
     <div class="critique"><h4>Critique trail</h4>${notes}</div>
   `;
   document.getElementById('overlay').classList.add('open');
+
+  if (a.status === 'needs_human'){
+    document.getElementById('revise-btn').addEventListener('click', async () => {
+      const seed = document.getElementById('revise-seed').value.trim();
+      const angle = document.getElementById('revise-angle').value.trim();
+      const statusEl = document.getElementById('revise-status');
+      if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
+      statusEl.textContent = 'Resubmitting…';
+      try{
+        const res = await fetch('/api/resubmit-article', {
+          method:'POST', headers:{'content-type':'application/json'},
+          body: JSON.stringify({ id: a.id, seed, angle: angle || undefined })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed');
+        statusEl.textContent = 'Back on the desk.';
+        document.getElementById('overlay').classList.remove('open');
+        loadArticles();
+      }catch(e){
+        statusEl.textContent = 'Error: ' + e.message;
+      }
+    });
+  }
 }
 document.getElementById('overlay').addEventListener('click', (e) => {
   if (e.target.id === 'overlay') e.currentTarget.classList.remove('open');
