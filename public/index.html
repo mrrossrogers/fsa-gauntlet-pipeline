@@ -59,6 +59,16 @@
     border:1px solid var(--rule); padding:1.25rem; background:#fff;
   }
   #submit-panel h2{ border:none; margin-bottom:0.9rem; }
+  .cat-tabs{ display:flex; gap:0.5rem; margin-bottom:0.9rem; }
+  .cat-tab{
+    flex:1; text-align:center; padding:0.55rem 0.4rem; border:1px solid var(--rule);
+    cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size:0.75rem;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft);
+    background:var(--paper); user-select:none;
+  }
+  .cat-tab.active[data-cat="food"]{ background:var(--food); color:#fff; border-color:var(--food); }
+  .cat-tab.active[data-cat="sex"]{ background:var(--sex); color:#fff; border-color:var(--sex); }
+  .cat-tab.active[data-cat="alcohol"]{ background:var(--alcohol); color:#fff; border-color:var(--alcohol); }
   #submit-panel textarea, #submit-panel input{
     width:100%; font-family:'Source Serif 4', serif; font-size:0.95rem;
     border:1px solid var(--rule); background:var(--paper); color:var(--ink);
@@ -68,12 +78,12 @@
     display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem;
     text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-bottom:0.3rem;
   }
-  #submit-panel button, #add-candidate button{
+  #submit-panel button{
     font-family:'IBM Plex Mono', monospace; font-size:0.78rem; text-transform:uppercase;
     letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
     padding:0.65rem 1.3rem; cursor:pointer;
   }
-  #submit-panel button:hover, #add-candidate button:hover{ opacity:0.85; }
+  #submit-panel button:hover{ opacity:0.85; }
   #submit-status{ font-family:'IBM Plex Mono', monospace; font-size:0.75rem; margin-top:0.6rem; }
 
   /* --- Category queues --- */
@@ -111,10 +121,6 @@
   }
   .actions button.publish{ background:var(--ready); color:#fff; border-color:var(--ready); }
   .actions button.kill{ background:var(--stuck); color:#fff; border-color:var(--stuck); }
-  .card .reason{
-    font-size:0.8rem; line-height:1.45; color:var(--stuck); margin-top:0.5rem;
-    padding-top:0.45rem; border-top:1px dashed var(--rule);
-  }
 
   /* --- Content funnel --- */
   #add-candidate{ border:1px solid var(--rule); padding:1.25rem; background:#fff; margin-bottom:1.75rem; }
@@ -164,62 +170,10 @@
   #detail h3{ font-family:'Fraunces', serif; margin:0 0 0.3rem; }
   #detail .meta{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; color:var(--ink-soft); margin-bottom:1rem; }
   #detail .draft{ white-space:pre-wrap; line-height:1.6; font-size:0.95rem; margin-bottom:1.25rem; }
-  #detail .stuck-callout{
-    background:#FBEDEA; border:1px solid var(--stuck); color:var(--stuck);
-    padding:0.75rem 0.9rem; margin-bottom:1.25rem; font-size:0.88rem; line-height:1.55;
-  }
-  #detail .stuck-callout strong{ display:block; font-family:'IBM Plex Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
-  #detail .revise-panel{ border:1px solid var(--rule); background:#fff; padding:1rem; margin-bottom:1.25rem; }
-  #detail .revise-panel label{
-    display:block; font-family:'IBM Plex Mono', monospace; font-size:0.65rem;
-    text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:0.3rem;
-  }
-  #detail .revise-panel textarea{
-    width:100%; font-family:'Source Serif 4', serif; font-size:0.9rem;
-    border:1px solid var(--rule); background:var(--paper); color:var(--ink);
-    padding:0.5rem; margin-bottom:0.6rem; resize:vertical; box-sizing:border-box;
-  }
-  #detail .revise-panel button{
-    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; text-transform:uppercase;
-    letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
-    padding:0.55rem 1.1rem; cursor:pointer;
-  }
-  #detail .revise-panel #revise-status{ font-size:0.72rem; margin-top:0.5rem; color:var(--ink-soft); }
   #detail .critique{ border-top:1px solid var(--rule); padding-top:0.9rem; }
   #detail .critique h4{ font-family:'IBM Plex Mono', monospace; font-size:0.7rem; text-transform:uppercase; margin:0 0 0.6rem; }
   #detail .note{ font-size:0.85rem; margin-bottom:0.6rem; padding-left:0.7rem; border-left:2px solid var(--rule); }
   #detail .note .agent{ font-family:'IBM Plex Mono', monospace; font-size:0.65rem; color:var(--ink-soft); text-transform:uppercase; }
-  #detail .review-cta{ margin-top:1.25rem; padding-top:1.1rem; border-top:1px solid var(--rule); display:flex; gap:0.6rem; }
-  #detail .review-cta button{
-    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; text-transform:uppercase;
-    letter-spacing:0.06em; background:var(--ink); color:var(--paper); border:none;
-    padding:0.6rem 1.2rem; cursor:pointer;
-  }
-  #detail .review-cta button:hover{ opacity:0.85; }
-
-  /* --- Final article preview --- */
-  #detail .preview-hero{
-    display:block; width:calc(100% + 3.5rem); max-height:420px; object-fit:cover;
-    margin:-1.75rem -1.75rem 1.5rem;
-  }
-  #detail .preview-category{
-    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; text-transform:uppercase;
-    letter-spacing:0.08em; margin-bottom:0.5rem;
-  }
-  #detail .preview-category.cat-food{ color:var(--food); }
-  #detail .preview-category.cat-sex{ color:var(--sex); }
-  #detail .preview-category.cat-alcohol{ color:var(--alcohol); }
-  #detail .preview-title{
-    font-family:'Fraunces', serif; font-weight:600; font-size:1.9rem; line-height:1.18;
-    margin:0 0 1.5rem;
-  }
-  #detail .preview-body p{ margin:0 0 1.15rem; line-height:1.75; font-size:1.02rem; }
-  #detail .preview-actions{ margin-top:1.5rem; padding-top:1.1rem; border-top:1px solid var(--rule); }
-  #detail .preview-actions button{
-    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; text-transform:uppercase;
-    letter-spacing:0.06em; background:#fff; color:var(--ink); border:1px solid var(--ink);
-    padding:0.5rem 1rem; cursor:pointer;
-  }
 </style>
 </head>
 <body>
@@ -238,6 +192,11 @@
 
   <section id="submit-panel">
     <h2>Send an idea to the desk</h2>
+    <div class="cat-tabs">
+      <div class="cat-tab active" data-cat="food">Food</div>
+      <div class="cat-tab" data-cat="sex">Sex</div>
+      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
+    </div>
     <label>Seed — the place / bottle / scenario</label>
     <textarea id="f-seed" rows="2" placeholder="the new omakase counter that opened on 3rd"></textarea>
     <label>Angle (optional — a take you already have)</label>
@@ -271,6 +230,11 @@
 
   <section id="add-candidate">
     <h2>Drop a candidate into the funnel</h2>
+    <div class="cat-tabs">
+      <div class="cat-tab active" data-cat="food">Food</div>
+      <div class="cat-tab" data-cat="sex">Sex</div>
+      <div class="cat-tab" data-cat="alcohol">Alcohol</div>
+    </div>
     <label>Seed</label>
     <textarea id="c-seed" rows="2" placeholder="a candidate subject worth considering"></textarea>
     <label>Angle (optional)</label>
@@ -283,12 +247,8 @@
 
   <section>
     <h2>Pending candidates</h2>
-    <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
-      <button id="scout-btn">Scout for ideas</button>
-      <span id="scout-status" class="mono" style="font-size:0.75rem; color:var(--ink-soft);"></span>
-    </div>
     <div class="candidate-list" id="candidate-list"></div>
-    <div class="empty" id="candidate-empty" style="display:none;">Nothing waiting for review. Click "Scout for ideas" above to generate a batch, or drop one in yourself.</div>
+    <div class="empty" id="candidate-empty" style="display:none;">Nothing waiting for review. Scout-sourced candidates will land here too, once that's built.</div>
   </section>
 
 </div>
@@ -299,6 +259,8 @@
 
 <script>
 const ACTIVE_TERMINAL = ['published','held','killed'];
+let selectedCat = 'food';
+let selectedCandidateCat = 'food';
 
 // top-level tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -309,21 +271,35 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
   if (btn.dataset.tab === 'funnel') loadCandidates();
 }));
 
+// the submit-panel's own category tabs (#submit-panel .cat-tab)
+document.querySelectorAll('#submit-panel .cat-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#submit-panel .cat-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  selectedCat = t.dataset.cat;
+}));
+
+// the add-candidate panel's own category tabs (#add-candidate .cat-tab)
+document.querySelectorAll('#add-candidate .cat-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#add-candidate .cat-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  selectedCandidateCat = t.dataset.cat;
+}));
+
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const seed = document.getElementById('f-seed').value.trim();
   const angle = document.getElementById('f-angle').value.trim();
   const issue = document.getElementById('f-issue').value.trim();
   const statusEl = document.getElementById('submit-status');
   if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
-  statusEl.textContent = 'Sending — classifying category…';
+  statusEl.textContent = 'Sending…';
   try{
     const res = await fetch('/api/submit-idea', {
       method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({ seed, angle: angle || undefined, issue: issue || undefined })
+      body: JSON.stringify({ category: selectedCat, seed, angle: angle || undefined, issue: issue || undefined })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'failed');
-    statusEl.textContent = 'On the desk (' + data.category + ') — ' + data.id;
+    statusEl.textContent = 'On the desk — ' + data.id;
     document.getElementById('f-seed').value = '';
     document.getElementById('f-angle').value = '';
     loadArticles();
@@ -341,36 +317,30 @@ function statusBadge(a){
 function card(a){
   const div = document.createElement('div');
   div.className = 'card';
-  const reasonHtml = (a.status === 'needs_human' && a.final_notes)
-    ? `<div class="reason">${a.final_notes}</div>`
-    : '';
   div.innerHTML = `
     <div class="title">${a.title}</div>
     <div class="meta"><span>${statusBadge(a)}</span><span>${new Date(a.updated_at).toLocaleString()}</span></div>
-    ${reasonHtml}
   `;
   div.addEventListener('click', (e) => { if (!e.target.closest('.actions')) openDetail(a.id); });
 
-  // Publish/Hold only make sense once a piece is actually ready for a final call.
-  // Kill is available at every non-terminal stage -- there was previously no way
-  // to dismiss a stuck or unwanted article before it reached ready_for_review.
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  actions.innerHTML = a.status === 'ready_for_review'
-    ? `<button class="publish" data-decision="publish">Publish</button>
-       <button data-decision="hold">Hold</button>
-       <button class="kill" data-decision="kill">Kill</button>`
-    : `<button class="kill" data-decision="kill">Kill</button>`;
-  actions.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    if (btn.dataset.decision === 'kill' && !confirm('Kill this article? This removes it from the active queue.')) return;
-    await fetch('/api/update-article', {
-      method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({ id: a.id, decision: btn.dataset.decision })
-    });
-    loadArticles();
-  }));
-  div.appendChild(actions);
+  if (a.status === 'ready_for_review'){
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.innerHTML = `
+      <button class="publish" data-decision="publish">Publish</button>
+      <button data-decision="hold">Hold</button>
+      <button class="kill" data-decision="kill">Kill</button>
+    `;
+    actions.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await fetch('/api/update-article', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ id: a.id, decision: btn.dataset.decision })
+      });
+      loadArticles();
+    }));
+    div.appendChild(actions);
+  }
   return div;
 }
 
@@ -398,10 +368,6 @@ async function loadArticles(){
   });
 }
 
-function escapeHtml(str){
-  return String(str || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
-
 async function openDetail(id){
   const res = await fetch('/api/get-article?id=' + id);
   const { article: a } = await res.json();
@@ -413,91 +379,14 @@ async function openDetail(id){
     </div>
   `).join('') || '<div class="empty">No critique yet.</div>';
 
-  const reasonLabel = a.status === 'needs_human' ? 'Why this needs you' : 'Notes';
-  // needs_human is the one status where the article is stuck waiting on a
-  // human correction -- give a way to fix and resubmit right here instead
-  // of forcing a kill + manually re-typed fresh submission.
-  const reviseHtml = a.status === 'needs_human' ? `
-    <div class="revise-panel">
-      <label>Revise the seed</label>
-      <textarea id="revise-seed" rows="2">${escapeHtml(a.seed)}</textarea>
-      <label>Revise the angle (optional)</label>
-      <textarea id="revise-angle" rows="2">${escapeHtml(a.angle)}</textarea>
-      <button id="revise-btn">Resubmit to desk</button>
-      <div id="revise-status" class="mono"></div>
-    </div>
-  ` : '';
-
-  // Review Final Article: a rendered preview of how the piece will actually
-  // read once published (hero image, title, formatted body) instead of the
-  // raw draft dump above. Available once there's a draft to show at all --
-  // most useful once text_approved or later, but not gated on status so an
-  // early draft can still be sanity-checked.
-  const reviewCta = a.draft ? `
-    <div class="review-cta">
-      <button id="review-final-btn">Review Final Article</button>
-    </div>
-  ` : '';
-
   document.getElementById('detail').innerHTML = `
     <span class="close" onclick="document.getElementById('overlay').classList.remove('open')">close ✕</span>
     <h3>${title}</h3>
-    <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}</div>
-    ${a.final_notes ? `<div class="stuck-callout"><strong>${reasonLabel}</strong>${a.final_notes}</div>` : ''}
-    ${reviseHtml}
+    <div class="meta">${a.category} · ${a.status.replace(/_/g,' ')} · issue: ${a.issue}${a.final_notes ? ' · ' + a.final_notes : ''}</div>
     <div class="draft">${a.draft ? a.draft.replace(/\n/g,'<br>') : '<span class="empty">No draft yet.</span>'}</div>
     <div class="critique"><h4>Critique trail</h4>${notes}</div>
-    ${reviewCta}
   `;
   document.getElementById('overlay').classList.add('open');
-
-  if (a.status === 'needs_human'){
-    document.getElementById('revise-btn').addEventListener('click', async () => {
-      const seed = document.getElementById('revise-seed').value.trim();
-      const angle = document.getElementById('revise-angle').value.trim();
-      const statusEl = document.getElementById('revise-status');
-      if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
-      statusEl.textContent = 'Resubmitting…';
-      try{
-        const res = await fetch('/api/resubmit-article', {
-          method:'POST', headers:{'content-type':'application/json'},
-          body: JSON.stringify({ id: a.id, seed, angle: angle || undefined })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'failed');
-        statusEl.textContent = 'Back on the desk.';
-        document.getElementById('overlay').classList.remove('open');
-        loadArticles();
-      }catch(e){
-        statusEl.textContent = 'Error: ' + e.message;
-      }
-    });
-  }
-  if (a.draft){
-    document.getElementById('review-final-btn').addEventListener('click', () => openPreview(a));
-  }
-}
-
-function openPreview(a){
-  const title = a.brief?.title_working || a.brief?.subject || '(untitled)';
-  const paragraphs = (a.draft || '')
-    .split(/\n\n+/)
-    .map(p => p.trim())
-    .filter(Boolean)
-    .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-
-  document.getElementById('detail').innerHTML = `
-    <span class="close" onclick="document.getElementById('overlay').classList.remove('open')">close ✕</span>
-    ${a.image_url ? `<img class="preview-hero" src="${escapeHtml(a.image_url)}" alt="${escapeHtml(title)}">` : ''}
-    <div class="preview-category cat-${escapeHtml(a.category)}">${escapeHtml(a.category)}</div>
-    <h1 class="preview-title">${escapeHtml(title)}</h1>
-    <div class="preview-body">${paragraphs || '<p class="empty">No draft yet.</p>'}</div>
-    <div class="preview-actions">
-      <button id="back-to-detail-btn">← Back to details</button>
-    </div>
-  `;
-  document.getElementById('back-to-detail-btn').addEventListener('click', () => openDetail(a.id));
 }
 document.getElementById('overlay').addEventListener('click', (e) => {
   if (e.target.id === 'overlay') e.currentTarget.classList.remove('open');
@@ -512,15 +401,15 @@ document.getElementById('candidate-btn').addEventListener('click', async () => {
   const issue = document.getElementById('c-issue').value.trim();
   const statusEl = document.getElementById('candidate-status');
   if (!seed){ statusEl.textContent = 'Seed is required.'; return; }
-  statusEl.textContent = 'Adding — classifying category…';
+  statusEl.textContent = 'Adding…';
   try{
     const res = await fetch('/api/add-candidate', {
       method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({ seed, angle: angle || undefined, issue: issue || undefined })
+      body: JSON.stringify({ category: selectedCandidateCat, seed, angle: angle || undefined, issue: issue || undefined })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'failed');
-    statusEl.textContent = 'Added to funnel (' + data.category + ').';
+    statusEl.textContent = 'Added to funnel.';
     document.getElementById('c-seed').value = '';
     document.getElementById('c-angle').value = '';
     loadCandidates();
@@ -569,24 +458,6 @@ async function loadCandidates(){
   document.getElementById('candidate-empty').style.display = candidates.length ? 'none' : 'block';
   candidates.forEach(c => list.appendChild(candidateCard(c)));
 }
-
-document.getElementById('scout-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('scout-btn');
-  const statusEl = document.getElementById('scout-status');
-  btn.disabled = true;
-  statusEl.textContent = 'Scouting — 9 ideas across food/sex/alcohol, takes a moment…';
-  try{
-    const res = await fetch('/api/scout-candidates', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({}) });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'failed');
-    statusEl.textContent = `Added ${data.added} candidates.`;
-    loadCandidates();
-  }catch(e){
-    statusEl.textContent = 'Error: ' + e.message;
-  }finally{
-    btn.disabled = false;
-  }
-});
 </script>
 
 </body>
