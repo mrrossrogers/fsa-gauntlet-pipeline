@@ -5,6 +5,9 @@
     },
     "api/scout-candidates.js": {
       "maxDuration": 30
+    },
+    "api/post-to-website.js": {
+      "maxDuration": 30
     }
   }
 }
