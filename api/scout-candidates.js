@@ -1,50 +1,68 @@
-// api/scout-candidates.js
-// POST /api/scout-candidates
-// On-demand: generates a batch of candidate ideas (3 per category, 9 total)
-// via the Scout agent and inserts them into fsa_content_candidates with
-// source: 'scout' -- they land in the Content Funnel tab for human review,
-// same approve/reject flow as manually-added candidates. Nothing here
-// bypasses the Assignment Editor's gate once approved into the gauntlet.
-
-import { getSupabase } from '../lib/supabase.js';
-import { callClaude } from '../lib/claude.js';
-import { SCOUT } from '../lib/prompts.js';
-
-const CATEGORIES = ['food', 'sex', 'alcohol'];
+import { requireOwner } from "../lib/auth.js";
+import { callAgent } from "../lib/claude.js";
+import { cleanText, getSupabase, normalizeCandidate } from "../lib/db.js";
+import { AGENT_SCHEMAS, SCOUT_EDITOR } from "../lib/prompts.js";
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
+  if (!requireOwner(req, res)) return;
 
   try {
     const supabase = getSupabase();
-    const { issue } = req.body || {};
-    const targetIssue = issue || 'current';
+    const [{ data: candidates, error: candidateError }, { data: articles, error: articleError }] = await Promise.all([
+      supabase.from("fsa_content_candidates").select("seed,angle,category,status").order("created_at", { ascending: false }).limit(120),
+      supabase.from("fsa_articles").select("seed,angle,category,status").order("created_at", { ascending: false }).limit(80),
+    ]);
+    if (candidateError) throw candidateError;
+    if (articleError) throw articleError;
 
-    // 9 candidates with a real seed + angle each run well past the 4096-token
-    // default used elsewhere in the pipeline (which is sized for single-item
-    // responses like a draft or one critique) -- give this call real headroom.
-    const result = await callClaude(SCOUT, JSON.stringify({ issue: targetIssue }), { maxTokens: 8192 });
-    const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+    const requested = Math.min(12, Math.max(3, Number(req.body?.count) || 9));
+    const result = await callAgent({
+      name: "candidate_scout",
+      system: SCOUT_EDITOR,
+      schema: AGENT_SCHEMAS.scout,
+      input: {
+        requested_count: requested,
+        issue: cleanText(req.body?.issue, 120) || "current",
+        existing_candidates: candidates,
+        existing_articles: articles,
+      },
+      maxTokens: 4200,
+    });
 
-    const rows = candidates
-      .filter(c => c && CATEGORIES.includes(c.category) && c.seed)
-      .map(c => ({
-        category: c.category,
-        seed: c.seed,
-        angle: c.angle || null,
-        issue: targetIssue,
-        source: 'scout',
+    const existing = new Set([...candidates, ...articles].map((item) => normalizeCandidate(item.seed)));
+    const seen = new Set();
+    const rows = result.candidates
+      .filter((candidate) => {
+        const key = normalizeCandidate(candidate.seed);
+        if (!key || existing.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, requested)
+      .map((candidate) => ({
+        category: candidate.category,
+        seed: cleanText(candidate.seed, 1200),
+        angle: cleanText(candidate.angle, 2000),
+        source: "scout",
+        issue: cleanText(req.body?.issue, 120) || "current",
+        status: "pending",
+        scorecard: {
+          reader_question: cleanText(candidate.reader_question, 700),
+          reader_promise: cleanText(candidate.reader_promise, 700),
+          reporting_path: cleanText(candidate.reporting_path, 1200),
+          originality_risk: cleanText(candidate.originality_risk, 700),
+          visual_opportunity: cleanText(candidate.visual_opportunity, 700),
+        },
       }));
 
-    if (!rows.length) {
-      return res.status(500).json({ error: 'Scout returned no usable candidates', raw: result });
-    }
-
-    const { data, error } = await supabase.from('fsa_content_candidates').insert(rows).select();
-    if (error) return res.status(500).json({ error: error.message });
-
-    return res.status(200).json({ added: data.length, candidates: data });
-  } catch (err) {
-    return res.status(500).json({ error: String(err.message || err) });
+    if (!rows.length) return res.status(200).json({ added: 0, message: "The scout did not find a sufficiently distinct candidate this round." });
+    const { data, error } = await supabase.from("fsa_content_candidates").insert(rows).select("id");
+    if (error) throw error;
+    return res.status(201).json({ added: data.length });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "The scout could not complete this round." });
   }
 }
+
+

@@ -1,37 +1,36 @@
-// api/add-candidate.js
-// POST /api/add-candidate
-// { "seed": "...", "angle": "...", "issue": "..." }
-// This is the manual side of the content funnel. The Scout agent
-// (api/scout-candidates.js) inserts rows here too, with source: 'scout' and
-// its own category already chosen -- the queue and the approve flow don't
-// change either way. Manual candidates get category classified the same way
-// as a direct submission (see api/submit-idea.js): no picker, the
-// Categorizer agent reads the seed text.
-
-import { getSupabase } from '../lib/supabase.js';
-import { callClaude } from '../lib/claude.js';
-import { CATEGORIZER } from '../lib/prompts.js';
+import { requireOwner } from "../lib/auth.js";
+import { cleanText, getSupabase, validCategory } from "../lib/db.js";
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
+  if (!requireOwner(req, res)) return;
+  const body = req.body || {};
+  const category = cleanText(body.category, 20).toLowerCase();
+  const seed = cleanText(body.seed, 1200);
+  if (!validCategory(category) || !seed) return res.status(400).json({ error: "Category and seed are required." });
 
   try {
-    const supabase = getSupabase();
-    const { seed, angle, issue } = req.body || {};
-    if (!seed) return res.status(400).json({ error: 'seed is required' });
-
-    const { category } = await callClaude(CATEGORIZER, JSON.stringify({ seed, angle }));
-    if (!['food', 'sex', 'alcohol'].includes(category)) {
-      throw new Error(`Categorizer returned an unexpected category: ${JSON.stringify(category)}`);
-    }
-
-    const { data, error } = await supabase.from('fsa_content_candidates').insert({
-      category, seed, angle: angle || null, issue: issue || 'current', source: 'manual',
+    const scorecard = {
+      reader_question: cleanText(body.readerQuestion, 700),
+      reader_promise: cleanText(body.readerPromise, 700),
+      reporting_path: cleanText(body.reportingPath, 1200),
+      originality_risk: cleanText(body.originalityRisk, 700),
+      visual_opportunity: cleanText(body.visualOpportunity, 700),
+    };
+    const { data, error } = await getSupabase().from("fsa_content_candidates").insert({
+      category,
+      seed,
+      angle: cleanText(body.angle, 2000) || null,
+      source: "manual",
+      issue: cleanText(body.issue, 120) || "current",
+      scorecard,
+      status: "pending",
     }).select().single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ id: data.id, category: data.category });
-  } catch (err) {
-    return res.status(500).json({ error: String(err.message || err) });
+    if (error) throw error;
+    return res.status(201).json({ candidate: data });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to add the candidate." });
   }
 }
+
+
