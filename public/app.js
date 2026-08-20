@@ -2,8 +2,8 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const ACTIVE_TERMINAL = new Set(["published", "held", "killed"]);
-const RUNNABLE = new Set(["submitted", "briefed", "drafted", "text_approved", "image_review"]);
-const STAGES = ["submitted", "briefed", "drafted", "text_approved", "ready_for_review"];
+const RUNNABLE = new Set(["submitted", "researched", "briefed", "drafted", "text_approved", "image_review"]);
+const STAGES = ["submitted", "researched", "briefed", "drafted", "text_approved", "ready_for_review"];
 const state = { articles: [], candidates: [], detail: null, detailPane: "preview", running: new Set(), editorThreads: {}, editorWorking: null, bulkRetrying: false, priorFocus: null, accessMode: "platform" };
 
 function houseText(value) {
@@ -52,7 +52,8 @@ function formatDate(value, withTime = false) {
 
 function labelForStatus(status) {
   const labels = {
-    submitted: "assignment",
+    submitted: "researching",
+    researched: "assignment",
     briefed: "drafting",
     drafted: "critics",
     text_approved: "art direction",
@@ -177,8 +178,8 @@ async function loadArticles() {
 function progressTrack(status) {
   const wrap = node("div", { className: "stage-track", attrs: { "aria-label": `Stage: ${labelForStatus(status)}` } });
   let index = STAGES.indexOf(status);
-  if (status === "image_review") index = 4;
-  if (status === "needs_human") index = 2;
+  if (status === "image_review") index = 5;
+  if (status === "needs_human") index = 3;
   STAGES.forEach((_, stageIndex) => wrap.append(node("i", { className: stageIndex <= index ? "done" : "" })));
   return wrap;
 }
