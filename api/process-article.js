@@ -12,6 +12,7 @@ import {
   EDITOR_IN_CHIEF,
   FACT_SPECIFICITY_DESK,
   PHOTO_CRITIC,
+  RESEARCHER,
 } from "../lib/prompts.js";
 
 const MAX_ROUNDS = 3;
@@ -114,7 +115,41 @@ export default async function handler(req, res) {
 
     let updated;
     switch (article.status) {
+      // Runs between Seed and Draft. Only the reported lane actually searches
+      // for secondary sourcing; essay lane passes through without a Claude
+      // call, since it has no sourcing requirement to help satisfy. Either
+      // way this always advances to "researched", so the Assignment Editor
+      // below sees a settled researcher_notes value (populated or
+      // intentionally empty) before it decides whether the reported-lane
+      // sourcing gate is met.
       case "submitted": {
+        if (article.format_lane === "reported") {
+          const researched = await callAgent({
+            name: "researcher",
+            system: RESEARCHER,
+            schema: AGENT_SCHEMAS.researcher,
+            input: {
+              category: article.category,
+              seed: article.seed,
+              angle: article.angle,
+            },
+            maxTokens: 1800,
+          });
+          updated = await updateAtStage(supabase, id, article.status, {
+            researcher_notes: researched.citations,
+            status: "researched",
+            final_notes: null,
+          });
+        } else {
+          updated = await updateAtStage(supabase, id, article.status, {
+            status: "researched",
+            final_notes: null,
+          });
+        }
+        break;
+      }
+
+      case "researched": {
         const brief = await callAgent({
           name: "assignment",
           system: ASSIGNMENT_EDITOR,
