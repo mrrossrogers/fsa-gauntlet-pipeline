@@ -184,6 +184,7 @@ select { min-height: 43px; }
 .badge-ready { color: var(--ready); }
 .badge-attention { color: var(--attention); }
 .badge-progress { color: var(--ink-soft); }
+.badge-lane { color: var(--ink-soft); border-style: dashed; }
 .stage-track { display: flex; gap: 3px; margin: .7rem 0 .2rem; }
 .stage-track i { flex: 1; height: 3px; background: var(--rule); }
 .stage-track i.done { background: var(--ready); }
@@ -218,6 +219,9 @@ tbody tr:hover { background: rgb(255 254 249 / 70%); }
 .scorecard strong { display: block; color: var(--ink-soft); font-family: "IBM Plex Mono", monospace; font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; }
 .scorecard p { margin: .25rem 0 0; font-size: .82rem; line-height: 1.35; }
 .candidate-card .card-actions { align-content: start; justify-content: end; margin: 0; }
+.candidate-format-lane { display: block; margin-top: .8rem; padding-top: .45rem; border-top: 1px solid var(--rule); }
+.candidate-format-lane span { display: block; margin-bottom: .35rem; }
+.candidate-format-lane select { width: 100%; }
 
 .overlay {
   position: fixed;

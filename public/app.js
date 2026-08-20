@@ -192,6 +192,7 @@ function storyCard(article) {
     node("p", { className: "seed-fallback", text: article.dek || article.angle || article.seed }),
     node("div", { className: "meta" }, [
       node("span", { className: `badge ${statusTone(article.status)}`, text: labelForStatus(article.status) }),
+      article.format_lane ? node("span", { className: "badge badge-lane", text: article.format_lane }) : null,
       node("span", { text: formatDate(article.updated_at, true) }),
     ]),
     progressTrack(article.status),
@@ -323,6 +324,7 @@ $("#article-form").addEventListener("submit", async (event) => {
   try {
     const article = await api("/api/submit-idea", { method: "POST", body: JSON.stringify({
       category: $("#article-category").value,
+      formatLane: $("#article-format-lane").value,
       seed: $("#article-seed").value,
       angle: $("#article-angle").value,
       sourceNotes: $("#article-sources").value,
@@ -331,7 +333,8 @@ $("#article-form").addEventListener("submit", async (event) => {
     $("#article-seed").value = "";
     $("#article-angle").value = "";
     $("#article-sources").value = "";
-    status.textContent = `On the desk in ${article.category}.`;
+    $("#article-format-lane").value = "";
+    status.textContent = `On the desk in ${article.category}, ${article.format_lane} lane.`;
     await loadArticles();
     if ($("#article-run").checked) await runArticle(article.id);
   } catch (error) {
@@ -388,9 +391,17 @@ function candidateCard(candidate) {
       scorecardCell("Reporting path", candidate.scorecard?.reporting_path),
       scorecardCell("Visual opportunity", candidate.scorecard?.visual_opportunity),
     ]),
+    node("label", { className: "candidate-format-lane" }, [
+      node("span", { text: "Format before approving" }),
+      node("select", { attrs: { "data-key": "formatLane" } }, [
+        node("option", { text: "Choose Essay or Reported", value: "" }),
+        node("option", { text: "Essay", value: "essay" }),
+        node("option", { text: "Reported", value: "reported" }),
+      ]),
+    ]),
   );
   const actions = node("div", { className: "card-actions" }, [
-    button("Approve → gauntlet", "button button-good", () => candidateAction(candidate, "approve")),
+    button("Approve → gauntlet", "button button-good", () => candidateAction(candidate, "approve", card)),
     button("Edit", "button button-outline", () => editCandidate(candidate, card)),
     button(candidate.status === "parked" ? "Return" : "Park", "button button-outline", () => candidateAction(candidate, candidate.status === "parked" ? "edit" : "park")),
     button("Reject", "button button-danger", () => candidateAction(candidate, "reject")),
@@ -440,13 +451,18 @@ $("#scout-btn").addEventListener("click", async () => {
   }
 });
 
-async function candidateAction(candidate, action) {
+async function candidateAction(candidate, action, card = null) {
   if (action === "edit" && candidate.status === "parked") {
     return saveCandidate(candidate, { ...candidate, status: "pending" });
   }
   if (["reject", "park"].includes(action) && !window.confirm(`${action === "park" ? "Park" : "Reject"} this candidate?`)) return;
+  let formatLane = "";
+  if (action === "approve") {
+    formatLane = card?.querySelector('[data-key="formatLane"]')?.value || "";
+    if (!formatLane) return toast("Choose Essay or Reported before approving this candidate.");
+  }
   try {
-    const result = await api("/api/update-candidate", { method: "POST", body: JSON.stringify({ id: candidate.id, action }) });
+    const result = await api("/api/update-candidate", { method: "POST", body: JSON.stringify({ id: candidate.id, action, formatLane }) });
     await loadCandidates();
     if (action === "approve") {
       switchTab("gauntlet");

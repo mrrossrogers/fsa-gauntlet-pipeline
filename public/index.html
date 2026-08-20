@@ -52,6 +52,12 @@
           <form id="article-form" class="editorial-form">
             <label for="article-category">Room</label>
             <select id="article-category" required><option value="food">Food</option><option value="sex">Sex</option><option value="alcohol">Alcohol</option></select>
+            <label for="article-format-lane">Format</label>
+            <select id="article-format-lane" required>
+              <option value="">Choose Essay or Reported</option>
+              <option value="essay">Essay: argument or interpretation, no sourcing required</option>
+              <option value="reported">Reported: needs a named interview subject, expert, or researcher-supplied source</option>
+            </select>
             <label for="article-seed">Seed: the place, bottle, question, or scenario</label>
             <textarea id="article-seed" rows="3" required placeholder="The ordinary meal, private question, or small ritual worth examining"></textarea>
             <label for="article-angle">Angle: the position you think the story should test</label>

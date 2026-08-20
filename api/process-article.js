@@ -124,7 +124,9 @@ export default async function handler(req, res) {
             seed: article.seed,
             angle: article.angle,
             issue: article.issue,
+            format_lane: article.format_lane || null,
             source_notes: article.source_notes || "",
+            researcher_notes: article.researcher_notes || [],
             previous_brief: article.brief || null,
             previous_draft: article.draft || "",
             editor_override: article.brief?.editor_override || null,
@@ -178,7 +180,9 @@ export default async function handler(req, res) {
       case "drafted": {
         const criticInput = {
           brief: article.brief,
+          format_lane: article.format_lane || null,
           source_notes: article.source_notes || "",
+          researcher_notes: article.researcher_notes || [],
           draft: article.draft,
           correspondent_open_questions: article.draft_meta || {},
         };
