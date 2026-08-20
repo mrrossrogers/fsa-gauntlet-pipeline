@@ -6,6 +6,9 @@
     },
     "api/scout-candidates.js": {
       "maxDuration": 60
+    },
+    "api/update-article.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

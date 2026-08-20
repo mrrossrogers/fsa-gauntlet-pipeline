@@ -2,9 +2,18 @@ import { requireOwner } from "../lib/auth.js";
 import { callAgent } from "../lib/claude.js";
 import { cleanText, getSupabase, safeHttpsUrl, uploadPublicImage } from "../lib/db.js";
 import { parseDataUrl } from "../lib/gemini-image.js";
-import { FSA_VOICE } from "../lib/prompts.js";
+import { getSiteContext, publishStoryToSite } from "../lib/github.js";
+import { AGENT_SCHEMAS, FSA_VOICE, PUBLISHER } from "../lib/prompts.js";
 
 const terminalStatus = { publish: "published", hold: "held", kill: "killed" };
+
+// Matches food-sex-alcohol1's own categoryDetails exactly (src/data/stories.ts)
+// so gauntlet-published stories read identically to hand-authored ones.
+const SITE_CATEGORY_DETAILS = {
+  food: { emotion: "Belonging", outcome: "Leave more connected than you arrived" },
+  sex: { emotion: "Intimacy", outcome: "Feel seen, wanted and closer" },
+  alcohol: { emotion: "Celebration", outcome: "Turn a passing moment into an occasion" },
+};
 
 // Vercel Serverless Functions cap the total request body at 4.5MB and that
 // cap cannot be raised from application code, so each reference photo is
@@ -181,6 +190,83 @@ function cleanSlug(value) {
     .slice(0, 90);
 }
 
+async function postToWebsiteUpdate(current) {
+  if (current.status !== "ready_for_review") {
+    return { error: "Finish or review the current gauntlet stage before posting this article to the site.", status: 409 };
+  }
+  if (!current.image_url) {
+    return { error: "Add a hero image before posting this article to the site.", status: 400 };
+  }
+  if (current.site_url) {
+    return { error: "This article was already posted to the site.", status: 409 };
+  }
+
+  const siteContext = await getSiteContext();
+  const primaryCategory = current.category.toUpperCase();
+  const candidateSlugs = siteContext.slugsForCategory(primaryCategory);
+  const heroAsset = (current.image_brief?.assets || []).find((asset) => asset?.role === "hero");
+
+  const result = await callAgent({
+    name: "publisher",
+    system: PUBLISHER,
+    schema: AGENT_SCHEMAS.publisher,
+    input: {
+      category: primaryCategory,
+      brief: current.brief,
+      draft: current.draft,
+      editor_recommendation: current.brief?.editor_recommendation || null,
+      hero_image_alt: heroAsset?.alt || "",
+      hero_image_caption: heroAsset?.caption || "",
+      existing_slugs_in_category: candidateSlugs,
+    },
+    maxTokens: 4000,
+  });
+
+  const slug = cleanSlug(current.brief?.slug || result.headline || current.seed);
+  if (!slug) return { error: "Could not derive a valid URL slug for this article.", status: 400 };
+
+  const relatedStorySlugs = (Array.isArray(result.related_story_slugs) ? result.related_story_slugs : [])
+    .filter((candidate) => candidateSlugs.includes(candidate))
+    .slice(0, 3);
+
+  const categoryDetails = SITE_CATEGORY_DETAILS[current.category] || SITE_CATEGORY_DETAILS.food;
+
+  const story = {
+    identifier: siteContext.identifier,
+    headline: cleanText(result.headline, 200),
+    slug,
+    primaryCategory,
+    description: cleanText(result.description, 400),
+    author: "Ross Rogers",
+    publicationDate: new Date().toISOString().slice(0, 10),
+    heroImage: current.image_url,
+    heroImageDescription: cleanText(result.hero_image_description, 300),
+    moment: cleanText(result.moment, 200),
+    tone: result.tone,
+    emotion: categoryDetails.emotion,
+    outcome: categoryDetails.outcome,
+    articleIntroduction: cleanText(result.article_introduction, 1200),
+    articleSections: (result.article_sections || []).map((section) => ({
+      heading: cleanText(section.heading, 150),
+      paragraphs: (section.paragraphs || []).map((paragraph) => cleanText(paragraph, 1500)).filter(Boolean),
+    })).filter((section) => section.heading && section.paragraphs.length),
+    articleQuote: cleanText(result.article_quote, 400),
+    planningNotes: (result.planning_notes || []).map((note) => cleanText(note, 300)).filter(Boolean),
+    editorialConclusion: cleanText(result.editorial_conclusion, 300),
+    relatedStorySlugs,
+    featured: false,
+  };
+  if (!story.articleSections.length) return { error: "The Publisher could not produce a usable article structure. Try again.", status: 502 };
+
+  const { commitSha } = await publishStoryToSite(story, siteContext);
+  const siteUrl = `https://www.foodsexalcohol.com/${current.category}/${slug}`;
+
+  return {
+    changes: { status: "published", final_decision: "publish", site_url: siteUrl, site_published_at: new Date().toISOString(), final_notes: null },
+    response: { status: "published", site_url: siteUrl, commit_sha: commitSha },
+  };
+}
+
 export function previewUpdate(body, current) {
   const brief = { ...(current.brief || {}) };
   const title = cleanText(body.title, 300);
@@ -319,6 +405,14 @@ export default async function handler(req, res) {
       if (result.error) return res.status(result.status).json({ error: result.error });
       const { error: refError } = await supabase.from("fsa_articles").update(result.changes).eq("id", id).eq("status", "reference_pending");
       if (refError) throw refError;
+      return res.status(200).json(result.response);
+    }
+
+    if (action === "post_to_website") {
+      const result = await postToWebsiteUpdate(current);
+      if (result.error) return res.status(result.status).json({ error: result.error });
+      const { error: publishError } = await supabase.from("fsa_articles").update(result.changes).eq("id", id).eq("status", "ready_for_review");
+      if (publishError) throw publishError;
       return res.status(200).json(result.response);
     }
 
