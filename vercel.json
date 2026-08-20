@@ -2,10 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/process-article.js": {
-      "maxDuration": 60
+      "maxDuration": 90
     },
     "api/scout-candidates.js": {
       "maxDuration": 60
+    },
+    "api/upload-reference-pack.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

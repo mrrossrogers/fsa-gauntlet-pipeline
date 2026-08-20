@@ -1,7 +1,7 @@
 import { requestHasCronSecret, requestIsOwner } from "../lib/auth.js";
 import { callAgent } from "../lib/claude.js";
-import { chooseArticleImage } from "../lib/auto-image.js";
-import { cleanText, getSupabase } from "../lib/db.js";
+import { generateGeminiImage } from "../lib/gemini-image.js";
+import { cleanText, getSupabase, uploadPublicImage } from "../lib/db.js";
 import {
   AGENT_SCHEMAS,
   ART_DIRECTOR,
@@ -251,32 +251,73 @@ export default async function handler(req, res) {
       }
 
       case "text_approved": {
-        const [art, recommendation] = await Promise.all([
-          callAgent({
-            name: "art_direction",
-            system: ART_DIRECTOR,
-            schema: AGENT_SCHEMAS.art,
-            input: { brief: article.brief, draft: article.draft, category: article.category },
-          }),
-          callAgent({
-            name: "editor_recommendation",
-            system: EDITOR_IN_CHIEF,
-            schema: AGENT_SCHEMAS.recommendation,
-            input: {
-              brief: article.brief,
-              draft: article.draft,
-              draft_meta: article.draft_meta,
-              critique_log: article.critique_log,
-            },
-          }),
-        ]);
-        const image = chooseArticleImage({ article });
+        // Resuming after a reference pack was attached: the art brief and
+        // editor recommendation were already decided and stored before the
+        // gate held this article at "reference_pending", so reuse them
+        // instead of re-running those two agents a second time.
+        let art = article.image_brief?.art_direction;
+        let recommendation = article.brief?.editor_recommendation;
+        if (!art) {
+          const [artResult, recommendationResult] = await Promise.all([
+            callAgent({
+              name: "art_direction",
+              system: ART_DIRECTOR,
+              schema: AGENT_SCHEMAS.art,
+              input: { brief: article.brief, draft: article.draft, category: article.category },
+            }),
+            callAgent({
+              name: "editor_recommendation",
+              system: EDITOR_IN_CHIEF,
+              schema: AGENT_SCHEMAS.recommendation,
+              input: {
+                brief: article.brief,
+                draft: article.draft,
+                draft_meta: article.draft_meta,
+                critique_log: article.critique_log,
+              },
+            }),
+          ]);
+          art = artResult;
+          recommendation = recommendationResult;
+        }
+
+        const referencePack = Array.isArray(article.reference_pack) ? article.reference_pack : [];
+        if (art.needs_reference_pack && !referencePack.length) {
+          updated = await updateAtStage(supabase, id, article.status, {
+            brief: { ...article.brief, editor_recommendation: recommendation },
+            image_brief: { ...article.image_brief, art_direction: art },
+            status: "reference_pending",
+            final_notes: `Attach 1-3 real reference photos of ${art.reference_subject || "this piece's specific real subject"} before the hero image can be generated.`,
+          });
+          break;
+        }
+
+        const generated = await generateGeminiImage({
+          prompt: art.image_prompt,
+          referenceImageUrls: referencePack.map((asset) => asset?.url).filter(Boolean),
+        });
+        const extension = generated.mimeType === "image/png" ? "png" : generated.mimeType === "image/webp" ? "webp" : "jpg";
+        const imageUrl = await uploadPublicImage(
+          supabase,
+          `generated/${id}/${Date.now()}.${extension}`,
+          Buffer.from(generated.base64, "base64"),
+          generated.mimeType,
+        );
+        const heroAsset = {
+          role: "hero",
+          url: imageUrl,
+          source_url: imageUrl,
+          credit: "Original FSA editorial artwork, generated for this piece",
+          license: "Original artwork created for FSA",
+          caption: art.caption_direction || "",
+          alt: art.alt_text_direction || `Original FSA editorial artwork for the ${article.category} desk.`,
+        };
         const existingAssets = Array.isArray(article.image_brief?.assets) ? article.image_brief.assets : [];
-        const assets = [image.asset, ...existingAssets.filter((asset) => asset?.role !== "hero")].slice(0, 3);
+        const assets = [heroAsset, ...existingAssets.filter((asset) => asset?.role !== "hero")].slice(0, 3);
         updated = await updateAtStage(supabase, id, article.status, {
           brief: { ...article.brief, editor_recommendation: recommendation },
-          image_url: image.asset.url,
-          image_brief: { ...art, assets, auto_image_source: image.source },
+          image_url: heroAsset.url,
+          image_brief: { ...art, assets, auto_image_source: "gemini_generated" },
           status: "ready_for_review",
           final_notes: null,
         });

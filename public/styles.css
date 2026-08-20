@@ -285,6 +285,14 @@ tbody tr:hover { background: rgb(255 254 249 / 70%); }
 .edit-actions, .decision-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
 #article-edit-form>.edit-actions { position: sticky; bottom: 0; z-index: 1; margin: .3rem -1rem -1rem; padding: .8rem 1rem; border-top: 1px solid var(--rule); background: rgb(255 254 249 / 96%); backdrop-filter: blur(10px); }
 .art-plan, .recommendation { margin-bottom: 1rem; font-size: .78rem; line-height: 1.5; }
+.reference-pack { border: 1px solid var(--rule); background: var(--surface); padding: 1rem; margin-bottom: 1rem; font-size: .78rem; line-height: 1.5; }
+.reference-pack h3 { margin: 0 0 .6rem; font-family: "Fraunces", serif; font-size: 1.1rem; }
+.reference-gallery { display: flex; flex-wrap: wrap; gap: .7rem; margin: .8rem 0; }
+.reference-gallery figure { width: 96px; margin: 0; }
+.reference-gallery img { width: 96px; height: 96px; object-fit: cover; border: 1px solid var(--rule); display: block; }
+.reference-gallery button { margin-top: .35rem; width: 100%; font-size: .58rem; padding: .4rem; }
+.reference-upload { display: block; margin-bottom: .8rem; }
+.reference-upload span { display: block; margin-bottom: .35rem; }
 .art-plan h3, .recommendation h3 { margin: 0 0 .6rem; font-family: "Fraunces", serif; font-size: 1.1rem; }
 .art-plan ul, .recommendation ul { margin: .4rem 0; padding-left: 1.2rem; }
 .recommendation strong { text-transform: uppercase; }
