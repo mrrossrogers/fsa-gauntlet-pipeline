@@ -293,6 +293,9 @@ tbody tr:hover { background: rgb(255 254 249 / 70%); }
 .reference-gallery button { margin-top: .35rem; width: 100%; font-size: .58rem; padding: .4rem; }
 .reference-upload { display: block; margin-bottom: .8rem; }
 .reference-upload span { display: block; margin-bottom: .35rem; }
+.publish-actions { border: 1px solid var(--rule); background: var(--surface); padding: 1rem; margin-top: 1rem; font-size: .78rem; line-height: 1.5; }
+.publish-actions h3 { margin: 0 0 .6rem; font-family: "Fraunces", serif; font-size: 1.1rem; }
+.publish-actions a.button { display: inline-block; text-align: center; text-decoration: none; }
 .art-plan h3, .recommendation h3 { margin: 0 0 .6rem; font-family: "Fraunces", serif; font-size: 1.1rem; }
 .art-plan ul, .recommendation ul { margin: .4rem 0; padding-left: 1.2rem; }
 .recommendation strong { text-transform: uppercase; }

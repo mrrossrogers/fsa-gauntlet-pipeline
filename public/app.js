@@ -61,7 +61,7 @@ function labelForStatus(status) {
     image_review: "image check",
     ready_for_review: "ready for you",
     needs_human: "needs you",
-    published: "package approved",
+    published: "live on site",
     held: "held",
     killed: "killed",
   };
@@ -967,6 +967,42 @@ function referencePackEditor(article) {
   return section;
 }
 
+async function postToWebsite(article) {
+  if (!window.confirm("Post this article live to foodsexalcohol.com? This publishes it immediately.")) return;
+  try {
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "post_to_website" }) });
+    state.detail = { ...state.detail, status: result.status, site_url: result.site_url };
+    renderDetail();
+    await loadArticles();
+    toast(`Posted live: ${result.site_url}`);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function publishActions(article) {
+  const section = node("section", { className: "publish-actions" }, [node("h3", { text: "Publish" })]);
+  if (article.site_url) {
+    section.append(
+      node("p", { text: "This article is live on the site." }),
+      node("a", { className: "button button-outline", text: "View on the site ↗", href: article.site_url, attrs: { target: "_blank", rel: "noopener noreferrer" } }),
+    );
+    return section;
+  }
+  if (article.status !== "ready_for_review") {
+    section.append(node("p", { text: "Posting to the site unlocks once this article is ready for your review." }));
+    return section;
+  }
+  section.append(
+    node("p", { text: "Review the exact article as it will appear, then post it live to foodsexalcohol.com." }),
+    node("div", { className: "edit-actions" }, [
+      button("Review Final Article", "button button-outline", () => { state.detailPane = "preview"; renderDetail(); }),
+      button("Post to Website", "button button-good", () => postToWebsite(article)),
+    ]),
+  );
+  return section;
+}
+
 function renderEdit(article) {
   const brief = article.brief || {};
   const assets = [...(article.image_brief?.assets || [])];
@@ -1029,7 +1065,7 @@ function renderEdit(article) {
       node("p", { className: "owner-guidance", text: guidance }),
     ]));
   }
-  side.append(editorEdits(article));
+  side.append(editorEdits(article), publishActions(article));
   grid.append(form, side);
   return grid;
 }
