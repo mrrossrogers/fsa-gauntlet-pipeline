@@ -906,7 +906,7 @@ function fileToDataUrl(file) {
 async function addReferenceImage(article, file) {
   try {
     const dataUrl = await fileToDataUrl(file);
-    const result = await api("/api/upload-reference-pack", { method: "POST", body: JSON.stringify({ id: article.id, action: "add", dataUrl, alt: file.name }) });
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_add", dataUrl, alt: file.name }) });
     state.detail = { ...state.detail, reference_pack: result.reference_pack };
     renderDetail();
     toast("Reference photo attached.");
@@ -917,7 +917,7 @@ async function addReferenceImage(article, file) {
 
 async function removeReferenceImage(article, index) {
   try {
-    const result = await api("/api/upload-reference-pack", { method: "POST", body: JSON.stringify({ id: article.id, action: "remove", index }) });
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_remove", index }) });
     state.detail = { ...state.detail, reference_pack: result.reference_pack };
     renderDetail();
     toast("Reference photo removed.");
@@ -928,7 +928,7 @@ async function removeReferenceImage(article, index) {
 
 async function resumeArtDirection(article) {
   try {
-    await api("/api/upload-reference-pack", { method: "POST", body: JSON.stringify({ id: article.id, action: "resume" }) });
+    await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_resume" }) });
     closeDetail();
     await runArticle(article.id);
     await loadArticles();
