@@ -10,7 +10,12 @@ name: FSA Gauntlet — process-article ping
 # 2. In that repo: Settings -> Secrets and variables -> Actions -> New
 #    repository secret, name it FSA_APP_URL, value = your deployed Vercel
 #    URL (e.g. https://fsa-gauntlet-pipeline-ross-rogers.vercel.app)
-# 3. Push it. Confirm under the repo's "Actions" tab that it's enabled and
+# 3. Add a second repository secret, FSA_CRON_SECRET, matching the
+#    FSA_CRON_SECRET environment variable set in the Vercel project.
+#    api/process-article.js now requires either an owner session or this
+#    bearer token (lib/auth.js requireOwner / requestHasCronSecret) --
+#    without this secret every scheduled ping gets a 401 and does nothing.
+# 4. Push it. Confirm under the repo's "Actions" tab that it's enabled and
 #    the schedule shows up.
 #
 # Note: GitHub's schedule is "best effort," not exact-to-the-second — under
@@ -29,4 +34,5 @@ jobs:
       - name: Ping process-article
         run: |
           curl -sf "${{ secrets.FSA_APP_URL }}/api/process-article" \
+            -H "Authorization: Bearer ${{ secrets.FSA_CRON_SECRET }}" \
             -o /dev/null -w "status: %{http_code}\n"
