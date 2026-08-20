@@ -1,5 +1,5 @@
 import { requireOwner } from "../lib/auth.js";
-import { cleanText, getSupabase, validCategory } from "../lib/db.js";
+import { cleanText, getSupabase, validCategory, validFormatLane } from "../lib/db.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
@@ -16,12 +16,15 @@ export default async function handler(req, res) {
 
     if (action === "approve") {
       if (candidate.approved_article_id) return res.status(200).json({ articleId: candidate.approved_article_id, status: "approved" });
+      const formatLane = cleanText(body.formatLane, 20).toLowerCase();
+      if (!validFormatLane(formatLane)) return res.status(400).json({ error: "Choose a format (Essay or Reported) before approving this candidate." });
       const sourceNotes = [
         candidate.scorecard?.reporting_path ? `Reporting path: ${candidate.scorecard.reporting_path}` : "",
         candidate.scorecard?.originality_risk ? `Originality risk: ${candidate.scorecard.originality_risk}` : "",
       ].filter(Boolean).join("\n");
       const { data: article, error: insertError } = await supabase.from("fsa_articles").insert({
         category: candidate.category,
+        format_lane: formatLane,
         seed: candidate.seed,
         angle: candidate.angle,
         issue: candidate.issue,
