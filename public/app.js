@@ -57,6 +57,7 @@ function labelForStatus(status) {
     briefed: "drafting",
     drafted: "critics",
     text_approved: "art direction",
+    reference_pending: "needs reference photos",
     image_review: "image check",
     ready_for_review: "ready for you",
     needs_human: "needs you",
@@ -69,7 +70,7 @@ function labelForStatus(status) {
 
 function statusTone(status) {
   if (status === "ready_for_review" || status === "published") return "badge-ready";
-  if (status === "needs_human" || status === "killed") return "badge-attention";
+  if (status === "needs_human" || status === "reference_pending" || status === "killed") return "badge-attention";
   return "badge-progress";
 }
 
@@ -180,6 +181,7 @@ function progressTrack(status) {
   let index = STAGES.indexOf(status);
   if (status === "image_review") index = 5;
   if (status === "needs_human") index = 3;
+  if (status === "reference_pending") index = 4;
   STAGES.forEach((_, stageIndex) => wrap.append(node("i", { className: stageIndex <= index ? "done" : "" })));
   return wrap;
 }
@@ -539,7 +541,7 @@ async function openDetail(id) {
   try {
     const { article } = await api(`/api/get-article?id=${encodeURIComponent(id)}`);
     state.detail = article;
-    state.detailPane = "preview";
+    state.detailPane = article.status === "reference_pending" ? "edit" : "preview";
     state.priorFocus = document.activeElement;
     renderDetail();
     $("#overlay").hidden = false;
@@ -892,6 +894,79 @@ function editorEdits(article) {
   return section;
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Could not read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addReferenceImage(article, file) {
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_add", dataUrl, alt: file.name }) });
+    state.detail = { ...state.detail, reference_pack: result.reference_pack };
+    renderDetail();
+    toast("Reference photo attached.");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function removeReferenceImage(article, index) {
+  try {
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_remove", index }) });
+    state.detail = { ...state.detail, reference_pack: result.reference_pack };
+    renderDetail();
+    toast("Reference photo removed.");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function resumeArtDirection(article) {
+  try {
+    await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "reference_resume" }) });
+    closeDetail();
+    await runArticle(article.id);
+    await loadArticles();
+    await openDetail(article.id);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function referencePackEditor(article) {
+  const pack = Array.isArray(article.reference_pack) ? article.reference_pack : [];
+  const section = node("section", { className: "reference-pack" }, [
+    node("h3", { text: "Reference pack" }),
+    node("p", { text: article.final_notes || "Attach 1-3 real photos of the piece's specific product, dish, or space so the generated hero image actually matches it." }),
+  ]);
+  if (pack.length) {
+    const gallery = node("div", { className: "reference-gallery" });
+    pack.forEach((asset, index) => {
+      gallery.append(node("figure", {}, [
+        node("img", { attrs: { src: asset.url, alt: asset.alt || "", loading: "lazy" } }),
+        button("Remove", "button button-outline", () => removeReferenceImage(article, index)),
+      ]));
+    });
+    section.append(gallery);
+  }
+  if (pack.length < 3) {
+    const input = node("input", { attrs: { type: "file", accept: "image/png,image/jpeg,image/webp" } });
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (file) addReferenceImage(article, file);
+      input.value = "";
+    });
+    section.append(node("label", { className: "reference-upload" }, [node("span", { text: `Add a photo (${pack.length}/3)` }), input]));
+  }
+  section.append(button("Resume art direction →", "button button-good", () => resumeArtDirection(article), { disabled: !pack.length }));
+  return section;
+}
+
 function renderEdit(article) {
   const brief = article.brief || {};
   const assets = [...(article.image_brief?.assets || [])];
@@ -940,7 +1015,10 @@ function renderEdit(article) {
   }
   form.append(editActions);
 
-  const side = node("aside", {}, [sitePackageCard(article), artPlan(article), recommendationCard(article)]);
+  const side = node("aside", {}, [
+    article.status === "reference_pending" ? referencePackEditor(article) : null,
+    sitePackageCard(article), artPlan(article), recommendationCard(article),
+  ]);
   if (article.final_notes) {
     const guidance = article.draft
       ? "Edit the draft and re-run the critics, rewrite it with creative license, or accept your edited text and move directly to art direction."

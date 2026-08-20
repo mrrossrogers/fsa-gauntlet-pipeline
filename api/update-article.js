@@ -1,9 +1,59 @@
 import { requireOwner } from "../lib/auth.js";
 import { callAgent } from "../lib/claude.js";
-import { cleanText, getSupabase, safeHttpsUrl } from "../lib/db.js";
+import { cleanText, getSupabase, safeHttpsUrl, uploadPublicImage } from "../lib/db.js";
+import { parseDataUrl } from "../lib/gemini-image.js";
 import { FSA_VOICE } from "../lib/prompts.js";
 
 const terminalStatus = { publish: "published", hold: "held", kill: "killed" };
+
+// Vercel Serverless Functions cap the total request body at 4.5MB and that
+// cap cannot be raised from application code, so each reference photo is
+// uploaded in its own request rather than batching 1-3 images into one call.
+// This lives on the shared update-article endpoint (rather than a dedicated
+// one) because the Hobby plan caps a deployment at 12 Serverless Functions
+// and this project is already at that ceiling.
+const MAX_REFERENCE_DATA_URL_LENGTH = 4_000_000;
+const MAX_REFERENCE_PACK_SIZE = 3;
+
+function referenceExtensionFor(mimeType) {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+}
+
+async function referencePackUpdate(action, body, current, supabase, id) {
+  if (current.status !== "reference_pending") {
+    return { error: "This article is not waiting on a reference pack right now. Reload and try again.", status: 409 };
+  }
+  const referencePack = Array.isArray(current.reference_pack) ? current.reference_pack : [];
+
+  if (action === "reference_add") {
+    if (referencePack.length >= MAX_REFERENCE_PACK_SIZE) return { error: "The reference pack already has 3 images.", status: 400 };
+    const dataUrl = String(body.dataUrl || "");
+    if (dataUrl.length > MAX_REFERENCE_DATA_URL_LENGTH) return { error: "That image is too large. Use a smaller or more compressed photo.", status: 400 };
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed) return { error: "Attach a PNG, JPEG, or WebP photo.", status: 400 };
+    const alt = cleanText(body.alt, 300);
+    const buffer = Buffer.from(parsed.data, "base64");
+    const path = `reference/${id}/${Date.now()}.${referenceExtensionFor(parsed.mimeType)}`;
+    const url = await uploadPublicImage(supabase, path, buffer, parsed.mimeType);
+    const nextPack = [...referencePack, { url, alt }];
+    return { changes: { reference_pack: nextPack }, response: { reference_pack: nextPack } };
+  }
+
+  if (action === "reference_remove") {
+    const index = Number(body.index);
+    if (!Number.isInteger(index) || index < 0 || index >= referencePack.length) {
+      return { error: "That reference image no longer exists.", status: 400 };
+    }
+    const nextPack = referencePack.filter((_, itemIndex) => itemIndex !== index);
+    return { changes: { reference_pack: nextPack }, response: { reference_pack: nextPack } };
+  }
+
+  // action === "reference_resume"
+  if (!referencePack.length) return { error: "Attach at least one reference photo first.", status: 400 };
+  return { changes: { status: "text_approved", final_notes: null }, response: { status: "text_approved" } };
+}
 
 const EDITOR_COLLABORATOR = `
 You are the private Editor Edits collaborator for Food Sex Alcohol. ${FSA_VOICE}
@@ -262,6 +312,14 @@ export default async function handler(req, res) {
         if (editError) throw editError;
       }
       return res.status(200).json(edit.response);
+    }
+
+    if (["reference_add", "reference_remove", "reference_resume"].includes(action)) {
+      const result = await referencePackUpdate(action, body, current, supabase, id);
+      if (result.error) return res.status(result.status).json({ error: result.error });
+      const { error: refError } = await supabase.from("fsa_articles").update(result.changes).eq("id", id).eq("status", "reference_pending");
+      if (refError) throw refError;
+      return res.status(200).json(result.response);
     }
 
     let changes;
