@@ -1,5 +1,5 @@
 import { requireOwner } from "../lib/auth.js";
-import { cleanText, getSupabase, validCategory, validFormatLane } from "../lib/db.js";
+import { cleanText, getSupabase, validCategory, validFormatLane, validSecondaryCategory } from "../lib/db.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
@@ -24,6 +24,7 @@ export default async function handler(req, res) {
       ].filter(Boolean).join("\n");
       const { data: article, error: insertError } = await supabase.from("fsa_articles").insert({
         category: candidate.category,
+        secondary_category: candidate.secondary_category,
         format_lane: formatLane,
         seed: candidate.seed,
         angle: candidate.angle,
@@ -49,8 +50,12 @@ export default async function handler(req, res) {
 
     if (action === "edit") {
       const category = cleanText(body.category, 20).toLowerCase();
+      const secondaryCategory = cleanText(body.secondaryCategory, 20).toLowerCase() || null;
       const seed = cleanText(body.seed, 1200);
       if (!validCategory(category) || !seed) return res.status(400).json({ error: "Category and seed are required." });
+      if (!validSecondaryCategory(category, secondaryCategory)) {
+        return res.status(400).json({ error: "The secondary room must be different from the primary room." });
+      }
       const scorecard = {
         ...(candidate.scorecard || {}),
         reader_question: cleanText(body.readerQuestion, 700),
@@ -61,6 +66,7 @@ export default async function handler(req, res) {
       };
       const { data, error } = await supabase.from("fsa_content_candidates").update({
         category,
+        secondary_category: secondaryCategory,
         seed,
         angle: cleanText(body.angle, 2000) || null,
         issue: cleanText(body.issue, 120) || candidate.issue,

@@ -42,6 +42,10 @@ export default async function handler(req, res) {
       .slice(0, requested)
       .map((candidate) => ({
         category: candidate.category,
+        // Defensive normalize: the schema allows the model to set
+        // secondary_category, but never trust it blindly if it happens to
+        // match the primary category (one room must stay prominent).
+        secondary_category: candidate.secondary_category && candidate.secondary_category !== candidate.category ? candidate.secondary_category : null,
         seed: cleanText(candidate.seed, 1200),
         angle: cleanText(candidate.angle, 2000),
         source: "scout",

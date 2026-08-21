@@ -52,6 +52,13 @@
           <form id="article-form" class="editorial-form">
             <label for="article-category">Room</label>
             <select id="article-category" required><option value="food">Food</option><option value="sex">Sex</option><option value="alcohol">Alcohol</option></select>
+            <label for="article-secondary-category">Secondary room (optional overlap)</label>
+            <select id="article-secondary-category">
+              <option value="">None: stays in one room</option>
+              <option value="food">Food</option>
+              <option value="sex">Sex</option>
+              <option value="alcohol">Alcohol</option>
+            </select>
             <label for="article-format-lane">Format</label>
             <select id="article-format-lane" required>
               <option value="">Choose Essay or Reported</option>
@@ -105,6 +112,13 @@
           <form id="candidate-form" class="editorial-form compact-form">
             <label for="candidate-category">Room</label>
             <select id="candidate-category" required><option value="food">Food</option><option value="sex">Sex</option><option value="alcohol">Alcohol</option></select>
+            <label for="candidate-secondary-category">Secondary room (optional overlap)</label>
+            <select id="candidate-secondary-category">
+              <option value="">None: stays in one room</option>
+              <option value="food">Food</option>
+              <option value="sex">Sex</option>
+              <option value="alcohol">Alcohol</option>
+            </select>
             <label for="candidate-seed">Candidate</label>
             <textarea id="candidate-seed" rows="3" required placeholder="A specific subject or human moment worth considering"></textarea>
             <label for="candidate-angle">Possible angle</label>

@@ -157,6 +157,7 @@ export default async function handler(req, res) {
           schema: AGENT_SCHEMAS.assignment,
           input: {
             category: article.category,
+            secondary_category: article.secondary_category || null,
             seed: article.seed,
             angle: article.angle,
             issue: article.issue,
@@ -179,6 +180,12 @@ export default async function handler(req, res) {
           updated = await updateAtStage(supabase, id, article.status, {
             brief,
             category: brief.category,
+            // The Assignment Editor can reclassify the primary category
+            // (unlike secondary_category, which is an owner/scout choice it
+            // never sets); if that reclassification happens to land on
+            // whatever the owner had picked as secondary, drop it rather
+            // than leave the article with the same room in both slots.
+            secondary_category: article.secondary_category && article.secondary_category !== brief.category ? article.secondary_category : null,
             status: "briefed",
             final_notes: null,
           });
@@ -217,6 +224,7 @@ export default async function handler(req, res) {
         const criticInput = {
           brief: article.brief,
           format_lane: article.format_lane || null,
+          secondary_category: article.secondary_category || null,
           source_notes: article.source_notes || "",
           researcher_notes: article.researcher_notes || [],
           draft: article.draft,

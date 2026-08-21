@@ -9,13 +9,14 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await getSupabase()
       .from("fsa_articles")
-      .select("id,category,format_lane,seed,angle,status,issue,brief,final_decision,final_notes,draft_round,image_round,image_url,image_brief,draft_meta,site_url,created_at,updated_at")
+      .select("id,category,secondary_category,format_lane,seed,angle,status,issue,brief,final_decision,final_notes,draft_round,image_round,image_url,image_brief,draft_meta,site_url,created_at,updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw error;
 
     const articles = data.map((article) => ({
       id: article.id,
       category: article.category,
+      secondary_category: article.secondary_category,
       format_lane: article.format_lane,
       seed: article.seed,
       angle: article.angle,
