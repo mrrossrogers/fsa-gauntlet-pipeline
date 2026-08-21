@@ -196,6 +196,7 @@ function storyCard(article) {
     node("div", { className: "meta" }, [
       node("span", { className: `badge ${statusTone(article.status)}`, text: labelForStatus(article.status) }),
       article.format_lane ? node("span", { className: "badge badge-lane", text: article.format_lane }) : null,
+      article.secondary_category ? node("span", { className: "badge badge-lane", text: `+ ${article.secondary_category}` }) : null,
       node("span", { text: formatDate(article.updated_at, true) }),
     ]),
     progressTrack(article.status),
@@ -318,6 +319,23 @@ $("#retry-stopped-btn").addEventListener("click", async () => {
   }
 });
 
+// Keeps a primary/secondary room pair from ever both pointing at the same
+// category: hides the currently-primary option from the secondary select,
+// and clears the secondary choice if the primary just changed to match it.
+function excludeFromSecondaryEls(primary, secondary) {
+  const sync = () => {
+    $$("option", secondary).forEach((option) => { if (option.value) option.hidden = option.value === primary.value; });
+    if (secondary.value === primary.value) secondary.value = "";
+  };
+  primary.addEventListener("change", sync);
+  sync();
+}
+function excludeFromSecondary(primarySelectId, secondarySelectId) {
+  excludeFromSecondaryEls($(primarySelectId), $(secondarySelectId));
+}
+excludeFromSecondary("#article-category", "#article-secondary-category");
+excludeFromSecondary("#candidate-category", "#candidate-secondary-category");
+
 $("#article-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const status = $("#article-status");
@@ -327,6 +345,7 @@ $("#article-form").addEventListener("submit", async (event) => {
   try {
     const article = await api("/api/submit-idea", { method: "POST", body: JSON.stringify({
       category: $("#article-category").value,
+      secondaryCategory: $("#article-secondary-category").value,
       formatLane: $("#article-format-lane").value,
       seed: $("#article-seed").value,
       angle: $("#article-angle").value,
@@ -337,7 +356,8 @@ $("#article-form").addEventListener("submit", async (event) => {
     $("#article-angle").value = "";
     $("#article-sources").value = "";
     $("#article-format-lane").value = "";
-    status.textContent = `On the desk in ${article.category}, ${article.format_lane} lane.`;
+    $("#article-secondary-category").value = "";
+    status.textContent = `On the desk in ${article.category}${article.secondary_category ? ` + ${article.secondary_category}` : ""}, ${article.format_lane} lane.`;
     await loadArticles();
     if ($("#article-run").checked) await runArticle(article.id);
   } catch (error) {
@@ -387,7 +407,9 @@ function candidateCard(candidate) {
     node("p", { className: "candidate-angle", text: candidate.angle || "No angle recorded yet." }),
     node("div", { className: "candidate-meta" }, [
       node("span", { className: `category-mark ${candidate.category}`, text: candidate.category[0].toUpperCase() }),
-      node("span", { text: candidate.category }), node("span", { text: candidate.source }), node("span", { text: candidate.issue }), node("span", { text: candidate.status }),
+      node("span", { text: candidate.category }),
+      candidate.secondary_category ? node("span", { className: "badge badge-lane", text: `+ ${candidate.secondary_category}` }) : null,
+      node("span", { text: candidate.source }), node("span", { text: candidate.issue }), node("span", { text: candidate.status }),
     ]),
     node("div", { className: "scorecard" }, [
       scorecardCell("Reader promise", candidate.scorecard?.reader_promise),
@@ -425,12 +447,14 @@ $("#candidate-form").addEventListener("submit", async (event) => {
   try {
     await api("/api/add-candidate", { method: "POST", body: JSON.stringify({
       category: $("#candidate-category").value,
+      secondaryCategory: $("#candidate-secondary-category").value,
       seed: $("#candidate-seed").value,
       angle: $("#candidate-angle").value,
       issue: $("#candidate-issue").value,
     }) });
     $("#candidate-seed").value = "";
     $("#candidate-angle").value = "";
+    $("#candidate-secondary-category").value = "";
     status.textContent = "Candidate added.";
     await loadCandidates();
   } catch (error) {
@@ -491,9 +515,16 @@ function editCandidate(candidate, card) {
   const form = node("form", { className: "edit-panel" });
   const category = node("select", { attrs: { "data-key": "category" } }, ["food", "sex", "alcohol"].map((value) => node("option", { text: value, value })));
   category.value = candidate.category;
+  const secondaryCategory = node("select", { attrs: { "data-key": "secondaryCategory" } }, [
+    node("option", { text: "None: stays in one room", value: "" }),
+    ...["food", "sex", "alcohol"].map((value) => node("option", { text: value, value })),
+  ]);
+  secondaryCategory.value = candidate.secondary_category || "";
+  excludeFromSecondaryEls(category, secondaryCategory);
   form.append(
     node("h3", { text: "Edit candidate" }),
     node("label", {}, [node("span", { text: "Room" }), category]),
+    node("label", {}, [node("span", { text: "Secondary room (optional overlap)" }), secondaryCategory]),
     field("Candidate", candidate.seed, "seed", 3),
     field("Angle", candidate.angle, "angle", 3),
     field("Reader question", candidate.scorecard?.reader_question, "readerQuestion", 2),
@@ -522,6 +553,7 @@ async function saveCandidate(candidate, payload) {
       id: candidate.id,
       action: "edit",
       category: payload.category || candidate.category,
+      secondaryCategory: payload.secondaryCategory ?? candidate.secondary_category ?? "",
       seed: payload.seed || candidate.seed,
       angle: payload.angle ?? candidate.angle,
       issue: payload.issue || candidate.issue,
