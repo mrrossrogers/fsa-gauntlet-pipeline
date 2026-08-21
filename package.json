@@ -7,7 +7,7 @@
     "node": "24.x"
   },
   "scripts": {
-    "check": "node scripts/check-style.mjs && node --check public/app.js && node --check api/process-article.js && node --check api/update-article.js && node --check api/get-article.js && node --check api/scout-candidates.js && node --check lib/gemini-image.js && node --check lib/github.js",
+    "check": "node scripts/check-style.mjs && node --check public/app.js && node --check api/process-article.js && node --check api/update-article.js && node --check api/get-article.js && node --check api/scout-candidates.js && node --check lib/gemini-image.js && node --check lib/github.js && node --check lib/notion.js",
     "test": "node --test"
   },
   "dependencies": {

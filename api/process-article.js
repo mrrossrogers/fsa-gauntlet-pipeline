@@ -2,6 +2,7 @@ import { requestHasCronSecret, requestIsOwner } from "../lib/auth.js";
 import { callAgent } from "../lib/claude.js";
 import { generateGeminiImage } from "../lib/gemini-image.js";
 import { cleanText, getSupabase, uploadPublicImage } from "../lib/db.js";
+import { findContentRegisterPageByUrl, findSimilarImageAssets, logGeneratedImage } from "../lib/notion.js";
 import {
   AGENT_SCHEMAS,
   ART_DIRECTOR,
@@ -292,9 +293,22 @@ export default async function handler(req, res) {
           break;
         }
 
+        // Notion Image Asset Log dedup check: advisory only, never blocks
+        // generation. A missing NOTION_API_KEY or any Notion outage is
+        // logged and skipped -- this is bookkeeping on top of the real
+        // deliverable (the image), not a gate like the Reference Pack above.
+        const referencePhotoUrls = referencePack.map((asset) => asset?.url).filter(Boolean);
+        const subjectForLog = art.needs_reference_pack ? art.reference_subject : art.image_prompt;
+        let similarExistingAssets = [];
+        try {
+          similarExistingAssets = await findSimilarImageAssets(subjectForLog);
+        } catch (notionError) {
+          console.warn("[gauntlet] Notion dedup check skipped", notionError instanceof Error ? notionError.message : notionError);
+        }
+
         const generated = await generateGeminiImage({
           prompt: art.image_prompt,
-          referenceImageUrls: referencePack.map((asset) => asset?.url).filter(Boolean),
+          referenceImageUrls: referencePhotoUrls,
         });
         const extension = generated.mimeType === "image/png" ? "png" : generated.mimeType === "image/webp" ? "webp" : "jpg";
         const imageUrl = await uploadPublicImage(
@@ -312,12 +326,43 @@ export default async function handler(req, res) {
           caption: art.caption_direction || "",
           alt: art.alt_text_direction || `Original FSA editorial artwork for the ${article.category} desk.`,
         };
+
+        // Log the generation to the Image Asset Log after the fact, same
+        // advisory/non-blocking treatment as the dedup check above. The
+        // Article relation is left empty unless Content Register already
+        // has a page whose Link exactly matches this article's site_url --
+        // expected to usually be empty for freshly-generated gauntlet
+        // content, since that register isn't auto-populated by this
+        // pipeline (see lib/notion.js for why).
+        let notionImageLogPageId = null;
+        try {
+          const contentRegisterPageId = article.site_url ? await findContentRegisterPageByUrl(article.site_url) : null;
+          const logged = await logGeneratedImage({
+            imageId: `${article.category}-${id.slice(0, 8)}-${Date.now()}`,
+            subject: subjectForLog,
+            prompt: art.image_prompt,
+            modelUsed: "Nano Banana Pro",
+            referencePhotoUrls,
+            generatedImageUrl: imageUrl,
+            articlePageId: contentRegisterPageId,
+          });
+          notionImageLogPageId = logged.pageId;
+        } catch (notionError) {
+          console.warn("[gauntlet] Notion image log skipped", notionError instanceof Error ? notionError.message : notionError);
+        }
+
         const existingAssets = Array.isArray(article.image_brief?.assets) ? article.image_brief.assets : [];
         const assets = [heroAsset, ...existingAssets.filter((asset) => asset?.role !== "hero")].slice(0, 3);
         updated = await updateAtStage(supabase, id, article.status, {
           brief: { ...article.brief, editor_recommendation: recommendation },
           image_url: heroAsset.url,
-          image_brief: { ...art, assets, auto_image_source: "gemini_generated" },
+          image_brief: {
+            ...art,
+            assets,
+            auto_image_source: "gemini_generated",
+            similar_existing_assets: similarExistingAssets,
+            notion_image_log_page_id: notionImageLogPageId,
+          },
           status: "ready_for_review",
           final_notes: null,
         });

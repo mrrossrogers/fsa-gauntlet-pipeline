@@ -735,6 +735,13 @@ function artPlan(article) {
     if (!Array.isArray(values) || !values.length) return;
     section.append(node("strong", { text: label }), node("ul", {}, values.map((value) => node("li", { text: value }))));
   });
+  if (Array.isArray(plan.similar_existing_assets) && plan.similar_existing_assets.length) {
+    section.append(
+      node("strong", { text: "Similar imagery already logged" }),
+      node("ul", {}, plan.similar_existing_assets.map((asset) => node("li", { text: `${asset.subject} (${asset.status || "Draft"})` }))),
+      node("p", { className: "owner-guidance", text: "Notion's Image Asset Log has related imagery. Consider reusing it or making this one clearly distinct." }),
+    );
+  }
   return section;
 }
 
