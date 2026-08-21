@@ -101,6 +101,10 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 .tab-btn + .tab-btn { border-left: 0; }
 .tab-btn.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.candidate-tabs { grid-column: unset; margin-bottom: 1rem; }
+.candidate-tabs .tab-btn { border-bottom: 1px solid var(--rule); }
+.candidate-tabs .tab-btn span { margin-left: .3rem; color: var(--ink-soft); }
+.candidate-tabs .tab-btn.active span { color: var(--paper); }
 
 .workspace { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem 4rem; }
 .tab-panel { animation: reveal .2s ease-out; }

@@ -4,7 +4,7 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const ACTIVE_TERMINAL = new Set(["published", "held", "killed"]);
 const RUNNABLE = new Set(["submitted", "researched", "briefed", "drafted", "text_approved", "image_review"]);
 const STAGES = ["submitted", "researched", "briefed", "drafted", "text_approved", "ready_for_review"];
-const state = { articles: [], candidates: [], detail: null, detailPane: "preview", running: new Set(), editorThreads: {}, editorWorking: null, bulkRetrying: false, priorFocus: null, accessMode: "platform" };
+const state = { articles: [], candidates: [], detail: null, detailPane: "preview", running: new Set(), editorThreads: {}, editorWorking: null, bulkRetrying: false, priorFocus: null, accessMode: "platform", funnelRoom: "all" };
 
 function houseText(value) {
   const styled = String(value ?? "").replace(/\s*\u2014\s*/g, ", ").replace(/\s*&mdash;\s*/gi, ", ");
@@ -435,10 +435,33 @@ function candidateCard(candidate) {
   return card;
 }
 
-function renderCandidates() {
-  $("#candidate-list").replaceChildren(...state.candidates.map(candidateCard));
-  $("#candidate-empty").hidden = state.candidates.length > 0;
+function inRoom(candidate, room) {
+  return room === "all" || candidate.category === room || candidate.secondary_category === room;
 }
+
+function renderCandidates() {
+  ["all", "food", "sex", "alcohol"].forEach((room) => {
+    $(`#room-count-${room}`).textContent = state.candidates.filter((candidate) => inRoom(candidate, room)).length;
+  });
+  $$(".candidate-tabs .tab-btn").forEach((tab) => {
+    const active = tab.dataset.room === state.funnelRoom;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  const visible = state.candidates.filter((candidate) => inRoom(candidate, state.funnelRoom));
+  $("#candidate-list").replaceChildren(...visible.map(candidateCard));
+  $("#candidate-empty").hidden = visible.length > 0;
+  $("#candidate-empty").textContent = state.funnelRoom === "all"
+    ? "Nothing is waiting for selection."
+    : `Nothing waiting in ${state.funnelRoom}.`;
+}
+
+$$(".candidate-tabs .tab-btn").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    state.funnelRoom = tab.dataset.room;
+    renderCandidates();
+  });
+});
 
 $("#candidate-form").addEventListener("submit", async (event) => {
   event.preventDefault();

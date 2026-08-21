@@ -135,6 +135,12 @@
             <div><p class="kicker">Pending ideas</p><h2>Content funnel</h2></div>
             <div class="scout-controls"><button class="button button-outline" id="scout-btn" type="button">Scout nine distinct ideas</button><span id="scout-status" role="status"></span></div>
           </div>
+          <nav class="tabs candidate-tabs" role="tablist" aria-label="Filter the funnel by room">
+            <button class="tab-btn active" type="button" role="tab" aria-selected="true" data-room="all">All <span id="room-count-all">0</span></button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-room="food">Food <span id="room-count-food">0</span></button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-room="sex">Sex <span id="room-count-sex">0</span></button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false" data-room="alcohol">Alcohol <span id="room-count-alcohol">0</span></button>
+          </nav>
           <div class="candidate-list" id="candidate-list"></div>
           <p class="empty" id="candidate-empty">Nothing is waiting for selection.</p>
         </section>
