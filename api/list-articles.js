@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await getSupabase()
       .from("fsa_articles")
-      .select("id,category,secondary_category,format_lane,seed,angle,status,issue,brief,final_decision,final_notes,draft_round,image_round,image_url,image_brief,draft_meta,site_url,created_at,updated_at")
+      .select("id,category,secondary_category,format_lane,seed,angle,status,issue,brief,final_decision,final_notes,draft_round,image_round,image_url,image_brief,draft_meta,site_url,approvals,created_at,updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw error;
 
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
       image_round: article.image_round,
       has_image: Boolean(article.image_url || article.image_brief?.assets?.length),
       site_url: article.site_url,
+      approvals: article.approvals || {},
       image_review: article.image_brief?.photo_review || null,
       open_questions: article.draft_meta?.open_questions || [],
       claims_to_verify: article.draft_meta?.claims_to_verify || [],
