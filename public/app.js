@@ -807,8 +807,7 @@ function renderPreview(article) {
   body.append(node("section", { className: "preview-verdict" }, [
     node("small", { text: "The FSA Verdict" }),
     node("h2", { text: "Was this experience worth your limited time on Earth?" }),
-    node("strong", { text: brief.editor_recommendation?.fsa_verdict?.replaceAll("_", " ") || "Your final judgment belongs here." }),
-    brief.editor_recommendation?.reasoning ? node("p", { text: brief.editor_recommendation.reasoning }) : null,
+    node("p", { text: brief.editor_recommendation?.reader_verdict || "Your final judgment belongs here." }),
   ]));
   preview.append(body);
   return preview;
