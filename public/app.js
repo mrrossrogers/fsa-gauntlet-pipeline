@@ -443,7 +443,7 @@ function renderCandidates() {
   ["all", "food", "sex", "alcohol"].forEach((room) => {
     $(`#room-count-${room}`).textContent = state.candidates.filter((candidate) => inRoom(candidate, room)).length;
   });
-  $$(".candidate-tabs .tab-btn").forEach((tab) => {
+  $$(".candidate-tabs .room-tab-btn").forEach((tab) => {
     const active = tab.dataset.room === state.funnelRoom;
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
@@ -456,7 +456,7 @@ function renderCandidates() {
     : `Nothing waiting in ${state.funnelRoom}.`;
 }
 
-$$(".candidate-tabs .tab-btn").forEach((tab) => {
+$$(".candidate-tabs .room-tab-btn").forEach((tab) => {
   tab.addEventListener("click", () => {
     state.funnelRoom = tab.dataset.room;
     renderCandidates();
