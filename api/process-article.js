@@ -325,14 +325,18 @@ export default async function handler(req, res) {
           Buffer.from(generated.base64, "base64"),
           generated.mimeType,
         );
+        // No credit/license/source_url: this is FSA's own generated
+        // artwork, not a sourced photo, so there is nothing external to
+        // credit or link to, and the owner does not want it visibly labeled
+        // as AI-generated on the article itself.
         const heroAsset = {
           role: "hero",
           url: imageUrl,
-          source_url: imageUrl,
-          credit: "Original FSA editorial artwork, generated for this piece",
-          license: "Original artwork created for FSA",
-          caption: art.caption_direction || "",
-          alt: art.alt_text_direction || `Original FSA editorial artwork for the ${article.category} desk.`,
+          source_url: "",
+          credit: "",
+          license: "",
+          caption: art.hero_caption || "",
+          alt: art.hero_alt_text || `Original FSA editorial artwork for the ${article.category} desk.`,
         };
 
         // Log the generation to the Image Asset Log after the fact, same
