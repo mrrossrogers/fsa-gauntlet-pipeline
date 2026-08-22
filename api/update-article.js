@@ -7,6 +7,61 @@ import { AGENT_SCHEMAS, FSA_VOICE, PUBLISHER } from "../lib/prompts.js";
 
 const terminalStatus = { publish: "published", hold: "held", kill: "killed" };
 
+// The final-review checklist. Order here is the order it renders in.
+const APPROVAL_KEYS = [
+  "title",
+  "hero_image",
+  "hero_caption_credit",
+  "primary_emotion",
+  "human_moment",
+  "time_return",
+  "article_body",
+  "inline_images",
+  "fsa_verdict",
+];
+
+function heroAsset(imageBrief) {
+  return (imageBrief?.assets || []).find((asset) => asset?.role === "hero") || null;
+}
+
+function inlineAssetsSignature(imageBrief) {
+  return JSON.stringify((imageBrief?.assets || [])
+    .filter((asset) => asset?.role !== "hero")
+    .map((asset) => ({ url: asset?.url, caption: asset?.caption, credit: asset?.credit })));
+}
+
+// An approval only ever clears itself, on a real change to the thing it was
+// approving -- it never sets itself true. Used by "save_preview" (the only
+// path that can quietly change approved content without re-running any
+// gauntlet stage) so a stale approval can't silently survive an edit.
+function recomputeApprovals(current, changes) {
+  const approvals = { ...(current.approvals || {}) };
+  if (Object.hasOwn(changes, "brief") && (changes.brief?.title_working || "") !== (current.brief?.title_working || "")) {
+    approvals.title = false;
+  }
+  if (Object.hasOwn(changes, "draft") && (changes.draft || "") !== (current.draft || "")) {
+    approvals.article_body = false;
+  }
+  if (Object.hasOwn(changes, "image_brief")) {
+    const before = heroAsset(current.image_brief);
+    const after = heroAsset(changes.image_brief);
+    if ((before?.url || "") !== (after?.url || "")) approvals.hero_image = false;
+    if ((before?.caption || "") !== (after?.caption || "") || (before?.credit || "") !== (after?.credit || "")) {
+      approvals.hero_caption_credit = false;
+    }
+    if (inlineAssetsSignature(current.image_brief) !== inlineAssetsSignature(changes.image_brief)) approvals.inline_images = false;
+  }
+  return approvals;
+}
+
+// Used by any action that sends the article back through a real gauntlet
+// stage (recheck, accept_text, creative_draft, resubmit, a revising editor
+// edit) -- brief, draft, art direction, and the verdict all get regenerated,
+// so every approval needs a fresh look regardless of what specifically changed.
+function resetApprovals() {
+  return {};
+}
+
 // Matches food-sex-alcohol1's own categoryDetails exactly (src/data/stories.ts)
 // so gauntlet-published stories read identically to hand-authored ones.
 const SITE_CATEGORY_DETAILS = {
@@ -80,6 +135,15 @@ supported facts and source boundaries intact. Never invent reporting, product us
 quotes, firsthand experience, sources, prices, or expert consensus. If the request
 cannot be completed honestly without missing information, ask concise questions
 instead of manufacturing an answer.
+
+You may receive one or more images alongside the editor's message: the
+article's current hero image, an inline image, or a photo the editor pasted
+in to point at something specific. When an image is attached, describe what
+you actually see in it before responding, so the editor knows you are looking
+at the same thing they are. Never comment on a photo's composition, content,
+or quality unless an image was actually attached to that message; if the
+editor describes a picture without attaching one, ask them to attach it or
+work from their description alone rather than guessing what it looks like.
 `;
 
 const EDITOR_SCHEMA = {
@@ -105,6 +169,12 @@ function cleanConversation(value) {
   })).filter((message) => message.content);
 }
 
+// Same 4.5MB Vercel body cap that governs reference-pack uploads. Pasted
+// chat images are capped smaller (2 of them, not 3) since this request also
+// carries the full conversation history and article context, not just the
+// image.
+const MAX_EDITOR_IMAGES = 2;
+
 async function editorEditsUpdate(body, current) {
   const mode = body.mode === "resubmit" ? "resubmit" : body.mode === "chat" ? "chat" : "";
   const instruction = cleanText(body.instruction, 5000);
@@ -112,10 +182,18 @@ async function editorEditsUpdate(body, current) {
     return { error: "Editor mode and instruction are required.", status: 400 };
   }
 
+  const pastedImages = (Array.isArray(body.images) ? body.images : [])
+    .filter((dataUrl) => typeof dataUrl === "string" && dataUrl.length <= MAX_REFERENCE_DATA_URL_LENGTH && parseDataUrl(dataUrl))
+    .slice(0, MAX_EDITOR_IMAGES)
+    .map((dataUrl) => ({ dataUrl }));
+  const heroUrl = safeHttpsUrl(heroAsset(current.image_brief)?.url || current.image_url);
+  const images = [...(body.attachHeroImage && heroUrl ? [{ url: heroUrl }] : []), ...pastedImages].slice(0, MAX_EDITOR_IMAGES);
+
   const result = await callAgent({
     name: "editor_edits",
     system: EDITOR_COLLABORATOR,
     schema: EDITOR_SCHEMA,
+    images,
     input: {
       mode,
       instruction,
@@ -153,6 +231,7 @@ async function editorEditsUpdate(body, current) {
     status: "drafted",
     draft_round: 1,
     final_notes: null,
+    approvals: resetApprovals(),
   } : null;
 
   return {
@@ -200,11 +279,15 @@ async function postToWebsiteUpdate(current) {
   if (current.site_url) {
     return { error: "This article was already posted to the site.", status: 409 };
   }
+  const approvals = current.approvals || {};
+  if (!APPROVAL_KEYS.every((key) => approvals[key])) {
+    return { error: "Approve every checklist item before posting this article to the site.", status: 409 };
+  }
 
   const siteContext = await getSiteContext();
   const primaryCategory = current.category.toUpperCase();
   const candidateSlugs = siteContext.slugsForCategory(primaryCategory);
-  const heroAsset = (current.image_brief?.assets || []).find((asset) => asset?.role === "hero");
+  const hero = heroAsset(current.image_brief);
 
   const result = await callAgent({
     name: "publisher",
@@ -215,8 +298,8 @@ async function postToWebsiteUpdate(current) {
       brief: current.brief,
       draft: current.draft,
       editor_recommendation: current.brief?.editor_recommendation || null,
-      hero_image_alt: heroAsset?.alt || "",
-      hero_image_caption: heroAsset?.caption || "",
+      hero_image_alt: hero?.alt || "",
+      hero_image_caption: hero?.caption || "",
       existing_slugs_in_category: candidateSlugs,
     },
     maxTokens: 4000,
@@ -416,6 +499,15 @@ export default async function handler(req, res) {
       return res.status(200).json(result.response);
     }
 
+    if (action === "toggle_approval") {
+      const key = cleanText(body.key, 40);
+      if (!APPROVAL_KEYS.includes(key)) return res.status(400).json({ error: "Unknown checklist item." });
+      const approvals = { ...(current.approvals || {}), [key]: Boolean(body.approved) };
+      const { data, error } = await supabase.from("fsa_articles").update({ approvals }).eq("id", id).select("id,status,approvals,updated_at").single();
+      if (error) throw error;
+      return res.status(200).json(data);
+    }
+
     let changes;
     if (terminalStatus[action]) {
       if (action === "publish" && current.status !== "ready_for_review") {
@@ -424,21 +516,31 @@ export default async function handler(req, res) {
       changes = { final_decision: action, status: terminalStatus[action] };
     } else if (action === "save_preview") {
       changes = previewUpdate(body, current);
+      // The only path here that can change approved content without
+      // re-running any gauntlet stage -- clear just the specific approvals
+      // whose underlying content actually changed.
+      changes.approvals = recomputeApprovals(current, changes);
     } else if (action === "recheck") {
-      changes = { ...previewUpdate(body, current), status: "drafted", final_notes: null };
+      changes = { ...previewUpdate(body, current), status: "drafted", final_notes: null, approvals: resetApprovals() };
     } else if (action === "check_image") {
       changes = previewUpdate(body, current);
       if (!changes.image_url) return res.status(400).json({ error: "Add a valid HTTPS image before running the photo check." });
       changes.status = "image_review";
       changes.final_notes = null;
+      // Only the photo critic re-runs here -- text approvals stay intact,
+      // but the image itself needs a fresh look.
+      changes.approvals = { ...recomputeApprovals(current, changes), hero_image: false, hero_caption_credit: false, inline_images: false };
     } else if (action === "creative_draft") {
       changes = creativeDraftUpdate(body, current);
+      changes.approvals = resetApprovals();
     } else if (action === "accept_text") {
       changes = acceptTextUpdate(body, current);
       if (!changes.draft) return res.status(400).json({ error: "Add or generate an article draft before moving to art direction." });
+      changes.approvals = resetApprovals();
     } else if (action === "retry") {
       if (current.status !== "needs_human") return res.status(409).json({ error: "Only an article marked Needs You can be re-run from this control." });
       changes = retryArticleUpdate(current);
+      changes.approvals = resetApprovals();
     } else if (action === "resubmit") {
       changes = {
         seed: cleanText(body.seed, 1200) || current.seed,
@@ -450,6 +552,7 @@ export default async function handler(req, res) {
         draft_meta: null,
         draft_round: 0,
         final_notes: null,
+        approvals: resetApprovals(),
       };
     } else if (action === "restore") {
       changes = { status: current.draft ? "ready_for_review" : "submitted", final_decision: null, final_notes: null };
@@ -457,7 +560,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Unknown article action." });
     }
 
-    const { data, error } = await supabase.from("fsa_articles").update(changes).eq("id", id).select("id,status,updated_at").single();
+    const { data, error } = await supabase.from("fsa_articles").update(changes).eq("id", id).select("id,status,approvals,updated_at").single();
     if (error) throw error;
     return res.status(200).json(data);
   } catch (error) {

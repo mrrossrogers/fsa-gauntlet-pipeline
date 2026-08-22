@@ -4,7 +4,12 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const ACTIVE_TERMINAL = new Set(["published", "held", "killed"]);
 const RUNNABLE = new Set(["submitted", "researched", "briefed", "drafted", "text_approved", "image_review"]);
 const STAGES = ["submitted", "researched", "briefed", "drafted", "text_approved", "ready_for_review"];
-const state = { articles: [], candidates: [], detail: null, detailPane: "preview", running: new Set(), editorThreads: {}, editorWorking: null, bulkRetrying: false, priorFocus: null, accessMode: "platform", funnelRoom: "all" };
+const state = {
+  articles: [], candidates: [], detail: null, detailPane: "preview", running: new Set(),
+  editorThreads: {}, editorWorking: null, bulkRetrying: false, priorFocus: null,
+  accessMode: "platform", funnelRoom: "all",
+  editorPendingImages: [], editorAttachHero: false, showPictures: false,
+};
 
 function houseText(value) {
   const styled = String(value ?? "").replace(/\s*\u2014\s*/g, ", ").replace(/\s*&mdash;\s*/gi, ", ");
@@ -197,6 +202,9 @@ function storyCard(article) {
       node("span", { className: `badge ${statusTone(article.status)}`, text: labelForStatus(article.status) }),
       article.format_lane ? node("span", { className: "badge badge-lane", text: article.format_lane }) : null,
       article.secondary_category ? node("span", { className: "badge badge-lane", text: `+ ${article.secondary_category}` }) : null,
+      article.status === "ready_for_review"
+        ? node("span", { className: "badge badge-lane", text: `${APPROVAL_ITEMS.filter(([key]) => article.approvals?.[key]).length}/${APPROVAL_ITEMS.length} approved` })
+        : null,
       node("span", { text: formatDate(article.updated_at, true) }),
     ]),
     progressTrack(article.status),
@@ -598,6 +606,9 @@ async function openDetail(id) {
     state.detail = article;
     state.detailPane = article.status === "reference_pending" ? "edit" : "preview";
     state.priorFocus = document.activeElement;
+    state.editorPendingImages = [];
+    state.editorAttachHero = false;
+    state.showPictures = false;
     renderDetail();
     $("#overlay").hidden = false;
     document.body.style.overflow = "hidden";
@@ -640,6 +651,11 @@ function renderDetail() {
   if (state.detailPane === "edit") pane.append(renderEdit(article));
   if (state.detailPane === "critique") pane.append(renderCritiques(article));
   detail.replaceChildren(detailHeader(article), tabs, pane);
+  // Whole tree above is assembled off-document, so any scrollTop set while
+  // building it is a no-op (scrollHeight is always 0 on a detached node) --
+  // has to happen here, after it's actually attached and laid out.
+  const thread = $(".editor-thread", detail);
+  if (thread) thread.scrollTop = thread.scrollHeight;
 }
 
 const categoryFallbackImages = {
@@ -682,6 +698,69 @@ function draftParts(draft) {
   });
 }
 
+// The final-review checklist. Keys must match APPROVAL_KEYS in
+// api/update-article.js -- order here is the order it renders in.
+const APPROVAL_ITEMS = [
+  ["title", "Title"],
+  ["hero_image", "Hero picture"],
+  ["hero_caption_credit", "Hero picture caption & credit"],
+  ["primary_emotion", "Primary emotion"],
+  ["human_moment", "Human moment"],
+  ["time_return", "Time return"],
+  ["article_body", "Article"],
+  ["inline_images", "Inline picture(s) within article"],
+  ["fsa_verdict", "FSA Verdict"],
+];
+
+async function toggleApproval(article, key, approved) {
+  try {
+    const result = await api("/api/update-article", { method: "POST", body: JSON.stringify({ id: article.id, action: "toggle_approval", key, approved }) });
+    state.detail = { ...state.detail, approvals: result.approvals };
+    await loadArticles();
+    renderDetail();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+// Switches to the edit pane and drops the owner straight into Editor Edits
+// with the referenced element already named in the input, so "what needs
+// work" never has to be re-explained from scratch.
+function discussInEditor(article, label) {
+  state.detailPane = "edit";
+  renderDetail();
+  const input = $("#editor-edits-input");
+  if (!input) return;
+  input.value = `${label}: `;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function approvalRow(article, key, label) {
+  const approved = Boolean((article.approvals || {})[key]);
+  const checkboxId = `approve-${key}`;
+  const checkbox = node("input", { id: checkboxId, attrs: { type: "checkbox" } });
+  checkbox.checked = approved;
+  checkbox.addEventListener("change", () => toggleApproval(article, key, checkbox.checked));
+  const row = node("div", { className: `approval-row ${approved ? "approved" : ""}` }, [
+    checkbox,
+    node("label", { attrs: { for: checkboxId }, text: label }),
+  ]);
+  if (!approved) row.append(button("Discuss with editor →", "text-button", () => discussInEditor(article, label)));
+  return row;
+}
+
+function approvalChecklist(article) {
+  const approvedCount = APPROVAL_ITEMS.filter(([key]) => (article.approvals || {})[key]).length;
+  const section = node("section", { className: "approval-checklist" }, [
+    node("h3", { text: "Final review checklist" }),
+    node("p", { className: "owner-guidance", text: `${approvedCount} of ${APPROVAL_ITEMS.length} approved. Every item must be checked before this can post to the site.` }),
+    node("div", { className: "approval-list" }, APPROVAL_ITEMS.map(([key, label]) => approvalRow(article, key, label))),
+  ]);
+  return section;
+}
+
 function renderPreview(article) {
   const brief = article.brief || {};
   const assets = article.image_brief?.assets || [];
@@ -696,6 +775,7 @@ function renderPreview(article) {
   const hero = legacyFallback ? { ...storedHero, url: fallbackUrl, source_url: fallbackUrl } : storedHero;
   const inline = assets.filter((asset) => asset !== hero && asset.role !== "hero");
   const preview = node("article", { className: "article-preview" });
+  if (article.status === "ready_for_review") preview.append(approvalChecklist(article));
   preview.append(node("div", { className: "preview-toolbar" }, [
     node("span", { text: "Exact article review" }),
     button("Edit this article", "button button-dark", () => { state.detailPane = "edit"; renderDetail(); }),
@@ -891,7 +971,8 @@ async function sendEditorEdit(article, mode) {
   if (!instruction || state.editorWorking) return;
   const pendingArticleChanges = currentArticlePayload(article);
   const thread = editorThread(article);
-  thread.push({ role: "editor", content: instruction });
+  const attachedImageCount = state.editorPendingImages.length + (state.editorAttachHero ? 1 : 0);
+  thread.push({ role: "editor", content: attachedImageCount ? `${instruction} [${attachedImageCount} image${attachedImageCount === 1 ? "" : "s"} attached]` : instruction });
   state.editorWorking = mode;
   renderDetail();
 
@@ -903,7 +984,11 @@ async function sendEditorEdit(article, mode) {
       mode,
       instruction,
       messages: thread.slice(0, -1),
+      images: state.editorPendingImages.map((image) => image.dataUrl),
+      attachHeroImage: state.editorAttachHero,
     }) });
+    state.editorPendingImages = [];
+    state.editorAttachHero = false;
     thread.push({ role: "assistant", content: result.message });
     if (result.revised) {
       const { article: refreshed } = await api(`/api/get-article?id=${encodeURIComponent(article.id)}`);
@@ -920,6 +1005,39 @@ async function sendEditorEdit(article, mode) {
     state.editorWorking = null;
     renderDetail();
   }
+}
+
+async function handleEditorPaste(event, article) {
+  const items = [...(event.clipboardData?.items || [])].filter((item) => item.type.startsWith("image/"));
+  if (!items.length) return;
+  event.preventDefault();
+  if (state.editorPendingImages.length >= 2) return toast("Only two images can be attached to one message. Send this one first.");
+  const file = items[0].getAsFile();
+  if (!file) return;
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    state.editorPendingImages.push({ dataUrl, name: file.name || "pasted image" });
+    renderDetail();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function pendingImageChips(article) {
+  const chips = node("div", { className: "editor-pending-images" });
+  if (state.editorAttachHero) {
+    chips.append(node("span", { className: "editor-image-chip" }, [
+      node("span", { text: "Current hero image" }),
+      button("×", "text-button", () => { state.editorAttachHero = false; renderDetail(); }),
+    ]));
+  }
+  state.editorPendingImages.forEach((image, index) => {
+    chips.append(node("span", { className: "editor-image-chip" }, [
+      node("img", { attrs: { src: image.dataUrl, alt: image.name } }),
+      button("×", "text-button", () => { state.editorPendingImages.splice(index, 1); renderDetail(); }),
+    ]));
+  });
+  return chips;
 }
 
 function editorEdits(article) {
@@ -941,18 +1059,34 @@ function editorEdits(article) {
       node("p", { text: state.editorWorking === "resubmit" ? "Reworking the article..." : "Reading your note..." }),
     ]));
   }
+  const heroUrl = (article.image_brief?.assets || []).find((asset) => asset?.role === "hero")?.url || article.image_url;
   const input = node("textarea", {
     id: "editor-edits-input",
-    placeholder: "Tell the editor what feels wrong, what must stay, or what to try next.",
+    placeholder: "Tell the editor what feels wrong, what must stay, or what to try next. Paste an image to show them directly.",
     attrs: { rows: "5", "aria-label": "Editor edit or question" },
   });
+  input.addEventListener("paste", (event) => handleEditorPaste(event, article));
+  const imageActions = node("div", { className: "editor-image-actions" });
+  if (heroUrl) {
+    imageActions.append(button(
+      state.editorAttachHero ? "Hero image attached ✓" : "Attach current hero image",
+      "button button-outline",
+      () => { state.editorAttachHero = !state.editorAttachHero; renderDetail(); },
+    ));
+  }
   const actions = node("div", { className: "editor-edit-actions" }, [
     button("Chat", "button button-dark", () => sendEditorEdit(article, "chat"), { disabled: Boolean(state.editorWorking) }),
     button("Re-submit", "button button-good", () => sendEditorEdit(article, "resubmit"), { disabled: Boolean(state.editorWorking) }),
     button("Hold", "button button-outline", () => decideArticle(article.id, "hold"), { disabled: Boolean(state.editorWorking) }),
     button("Kill", "button button-danger", () => decideArticle(article.id, "kill"), { disabled: Boolean(state.editorWorking) }),
   ]);
-  section.append(thread, node("label", { className: "editor-input" }, [node("span", { text: "Your edit or question" }), input]), actions);
+  section.append(
+    thread,
+    pendingImageChips(article),
+    imageActions,
+    node("label", { className: "editor-input" }, [node("span", { text: "Your edit or question" }), input]),
+    actions,
+  );
   return section;
 }
 
@@ -1055,13 +1189,34 @@ function publishActions(article) {
     section.append(node("p", { text: "Posting to the site unlocks once this article is ready for your review." }));
     return section;
   }
+  const approvedCount = APPROVAL_ITEMS.filter(([key]) => (article.approvals || {})[key]).length;
+  const allApproved = approvedCount === APPROVAL_ITEMS.length;
   section.append(
-    node("p", { text: "Review the exact article as it will appear, then post it live to foodsexalcohol.com." }),
+    node("p", { text: allApproved
+      ? "Review the exact article as it will appear, then post it live to foodsexalcohol.com."
+      : `${approvedCount} of ${APPROVAL_ITEMS.length} checklist items approved. Approve everything in Review Final Article before this can post.` }),
     node("div", { className: "edit-actions" }, [
       button("Review Final Article", "button button-outline", () => { state.detailPane = "preview"; renderDetail(); }),
-      button("Post to Website", "button button-good", () => postToWebsite(article)),
+      button("Post to Website", "button button-good", () => postToWebsite(article), { disabled: !allApproved }),
     ]),
   );
+  return section;
+}
+
+function picturesGallery(article) {
+  const assets = (article.image_brief?.assets || []).filter((asset) => asset?.url);
+  const section = node("section", { className: "pictures-gallery" }, [node("h4", { text: "Selected pictures" })]);
+  if (!assets.length) {
+    section.append(node("p", { className: "empty", text: "No pictures selected yet." }));
+    return section;
+  }
+  section.append(node("div", { className: "pictures-gallery-grid" }, assets.map((asset) => node("figure", {}, [
+    node("img", { attrs: { src: asset.url, alt: asset.alt || "", loading: "lazy" } }),
+    node("figcaption", {}, [
+      node("strong", { text: asset.role === "hero" ? "Hero" : "Inline" }),
+      asset.caption ? node("p", { text: asset.caption }) : null,
+    ]),
+  ]))));
   return section;
 }
 
@@ -1081,6 +1236,10 @@ function renderEdit(article) {
     ]),
   ]);
   form.append(
+    node("div", { className: "pictures-toggle-wrap" }, [
+      button(state.showPictures ? "Hide pictures ▲" : "View pictures ▼", "button button-outline", () => { state.showPictures = !state.showPictures; renderDetail(); }),
+      state.showPictures ? picturesGallery(article) : null,
+    ]),
     labeledControl("Working title", "edit-title", brief.title_working || brief.subject || article.seed),
     labeledControl("Dek", "edit-dek", brief.dek || brief.reader_promise || "", 3),
     labeledControl("Article slug", "edit-slug", brief.slug || ""),
