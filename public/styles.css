@@ -86,7 +86,13 @@ button:disabled { cursor: wait; opacity: .55; }
 .header-actions { display: flex; align-items: center; gap: 1rem; }
 .sync-state { font-size: .68rem; color: var(--ink-soft); }
 .tabs { grid-column: 1 / -1; display: flex; align-self: end; }
-.tab-btn {
+/*
+ * .tab-btn is also a JS hook (see app.js's blanket ".tab-btn" click
+ * listener driving the Gauntlet/Content Funnel switch) -- .room-tab-btn
+ * shares its look via this same rule but is never targeted by that
+ * listener, so the funnel's room filter can't accidentally trigger it.
+ */
+.tab-btn, .room-tab-btn {
   min-height: 42px;
   padding: .65rem 1.1rem;
   border: 1px solid var(--rule);
@@ -99,12 +105,12 @@ button:disabled { cursor: wait; opacity: .55; }
   letter-spacing: .06em;
   cursor: pointer;
 }
-.tab-btn + .tab-btn { border-left: 0; }
-.tab-btn.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
-.candidate-tabs { grid-column: unset; margin-bottom: 1rem; }
-.candidate-tabs .tab-btn { border-bottom: 1px solid var(--rule); }
-.candidate-tabs .tab-btn span { margin-left: .3rem; color: var(--ink-soft); }
-.candidate-tabs .tab-btn.active span { color: var(--paper); }
+.tab-btn + .tab-btn, .room-tab-btn + .room-tab-btn { border-left: 0; }
+.tab-btn.active, .room-tab-btn.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.candidate-tabs { display: flex; flex-wrap: wrap; margin-bottom: 1rem; }
+.candidate-tabs .room-tab-btn { border-bottom: 1px solid var(--rule); }
+.candidate-tabs .room-tab-btn span { margin-left: .3rem; color: var(--ink-soft); }
+.candidate-tabs .room-tab-btn.active span { color: var(--paper); }
 
 .workspace { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem 4rem; }
 .tab-panel { animation: reveal .2s ease-out; }
